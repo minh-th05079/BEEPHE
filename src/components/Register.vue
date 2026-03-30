@@ -1,5 +1,5 @@
 <script setup>
-import { currentView, regUsername, regEmail, regPassword, regConfirmPassword, handleRegister } from '../store.js'
+import { currentView, regUsername, regEmail, regPhone, regPassword, regConfirmPassword, handleRegister } from '../store.js'
 </script>
 
 <template>
@@ -9,12 +9,17 @@ import { currentView, regUsername, regEmail, regPassword, regConfirmPassword, ha
       
       <div class="mb-3">
         <label class="form-label fw-bold">Tài khoản</label>
-        <input v-model="regUsername" type="text" class="form-control" placeholder="Nhập tên tài khoản...">
+        <input v-model="regUsername" type="text" class="form-control" placeholder="Tên đăng nhập...">
       </div>
       
       <div class="mb-3">
         <label class="form-label fw-bold">Email</label>
         <input v-model="regEmail" type="email" class="form-control" placeholder="Nhập email hợp lệ...">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Số điện thoại</label>
+        <input v-model="regPhone" type="text" class="form-control" placeholder="Nhập số điện thoại...">
       </div>
       
       <div class="mb-3">
