@@ -4,7 +4,7 @@ import {
   dsDanhMuc, showFormDM, isEditDM, formDM, luuDanhMuc, xoaDanhMuc, suaDanhMuc, huyFormDM,
   adminSanPhams, showFormSP, isEditSP, formSP, luuSanPham, xoaSanPham, suaSanPham, huyFormSP,
   registeredUsers, showDetailKH, selectedKH, xemKhachHang, dongChiTietKH, toggleBlacklist,
-  dsHoaDon, layDuLieuHoaDon, capNhatTrangThaiHoaDon
+  dsHoaDon, layDuLieuHoaDon, showDetailHD, selectedHD, xemHoaDon, dongChiTietHD, xoaHoaDon
 } from '../store.js'
 
 const handleFileUpload = (event) => {
@@ -86,7 +86,7 @@ const handleFileUpload = (event) => {
 
     <div v-if="adminTab === 'khach-hang'">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="m-0 text-primary fw-bold">{{ showDetailKH ? 'Chi tiết Khách Hàng' : 'Danh sách Tài khoản (MockAPI)' }}</h4>
+        <h4 class="m-0 text-primary fw-bold">{{ showDetailKH ? 'Chi tiết Khách Hàng' : 'Danh sách Tài khoản' }}</h4>
       </div>
       
       <div v-if="showDetailKH" class="card p-4 shadow-sm bg-white border-0">
@@ -129,19 +129,55 @@ const handleFileUpload = (event) => {
 
     <div v-if="adminTab === 'hoa-don'">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="m-0 text-primary fw-bold">Theo dõi & Xử lý Đơn Hàng</h4>
-        <button @click="layDuLieuHoaDon" class="btn btn-outline-primary fw-bold">🔄 Làm mới danh sách</button>
+        <h4 class="m-0 text-primary fw-bold">{{ showDetailHD ? 'Chi tiết Đơn Hàng' : 'Theo dõi Đơn Hàng' }}</h4>
+        <button v-if="!showDetailHD" @click="layDuLieuHoaDon" class="btn btn-outline-primary fw-bold">🔄 Làm mới danh sách</button>
+      </div>
+
+      <div v-if="showDetailHD" class="card p-4 shadow-sm bg-white border-0">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="fw-bold mb-2">Mã đơn hàng</label><input :value="'#' + selectedHD.id" class="form-control bg-light text-primary fw-bold" readonly></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Ngày đặt</label><input :value="selectedHD.ngay" class="form-control bg-light" readonly></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Trạng thái</label><input :value="selectedHD.trangThai" class="form-control bg-light" readonly></div>
+          
+          <h5 class="mt-4 border-bottom pb-2 fw-bold text-primary">Thông tin Khách hàng</h5>
+          <div class="col-md-4"><label class="fw-bold mb-2">Tên khách</label><input :value="selectedHD.khach" class="form-control bg-light" readonly></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Số điện thoại</label><input :value="selectedHD.sdt || 'Không có'" class="form-control bg-light" readonly></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Email</label><input :value="selectedHD.email || 'Không có'" class="form-control bg-light" readonly></div>
+
+          <h5 class="mt-4 border-bottom pb-2 fw-bold text-primary">Chi tiết Sản phẩm</h5>
+          <div class="col-12">
+            <ul class="list-group">
+              <li v-for="(mon, index) in selectedHD.danhSachMon" :key="index" class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                  <img :src="mon.img" width="50" height="50" class="rounded border" style="object-fit: cover;">
+                  <div>
+                    <strong class="d-block">{{ mon.name }}</strong>
+                    <small class="text-muted">{{ Number(mon.price).toLocaleString() }}đ x {{ mon.quantity }}</small>
+                  </div>
+                </div>
+                <span class="text-danger fw-bold">{{ (mon.price * mon.quantity).toLocaleString() }}đ</span>
+              </li>
+            </ul>
+          </div>
+          <div class="col-12 text-end mt-3">
+            <h4 class="fw-bold">Tổng tiền: <span class="text-danger">{{ Number(selectedHD.tong).toLocaleString() }} VNĐ</span></h4>
+          </div>
+        </div>
+
+        <div class="mt-4 border-top pt-3 d-flex gap-2">
+          <button @click="dongChiTietHD" class="btn btn-secondary fw-bold">← Quay lại danh sách</button>
+          <button @click="xoaHoaDon(selectedHD.id)" class="btn btn-danger fw-bold ms-auto">🗑️ Xóa hóa đơn này</button>
+        </div>
       </div>
       
-      <table class="table table-hover shadow-sm bg-white rounded align-middle">
+      <table v-else class="table table-hover shadow-sm bg-white rounded align-middle">
         <thead class="table-primary">
           <tr>
             <th>Mã ĐH</th>
             <th>Ngày đặt</th>
             <th>Khách hàng</th>
-            <th style="width: 25%">Chi tiết món</th>
+            <th style="width: 25%">Chi tiết (Tóm tắt)</th>
             <th>Tổng tiền</th>
-            <th>Trạng thái</th>
             <th class="text-center">Thao tác</th>
           </tr>
         </thead>
@@ -153,27 +189,17 @@ const handleFileUpload = (event) => {
             <td><small class="text-secondary">{{ hd.chiTiet }}</small></td>
             <td class="text-danger fw-bold">{{ Number(hd.tong).toLocaleString() }}đ</td>
             
-            <td>
-              <span v-if="hd.trangThai === 'Chờ xác nhận'" class="badge bg-warning text-dark p-2">Chờ xác nhận</span>
-              <span v-else-if="hd.trangThai === 'Đang làm'" class="badge bg-info p-2">Đang pha chế</span>
-              <span v-else-if="hd.trangThai === 'Đang giao'" class="badge bg-primary p-2">Đang giao hàng</span>
-              <span v-else-if="hd.trangThai === 'Hoàn thành'" class="badge bg-success p-2">Hoàn thành</span>
-              <span v-else-if="hd.trangThai === 'Đã hủy'" class="badge bg-danger p-2">Đã hủy</span>
-            </td>
-            
             <td class="text-center">
-              <div class="d-flex flex-wrap gap-1 justify-content-center">
-                <button v-if="hd.trangThai === 'Chờ xác nhận'" @click="capNhatTrangThaiHoaDon(hd.id, 'Đang làm')" class="btn btn-sm btn-info text-white fw-bold">Duyệt đơn</button>
-                <button v-if="hd.trangThai === 'Đang làm'" @click="capNhatTrangThaiHoaDon(hd.id, 'Đang giao')" class="btn btn-sm btn-primary fw-bold">Giao hàng</button>
-                <button v-if="hd.trangThai === 'Đang giao'" @click="capNhatTrangThaiHoaDon(hd.id, 'Hoàn thành')" class="btn btn-sm btn-success fw-bold">Xong</button>
-                
-                <button v-if="hd.trangThai === 'Chờ xác nhận' || hd.trangThai === 'Đang làm'" @click="capNhatTrangThaiHoaDon(hd.id, 'Đã hủy')" class="btn btn-sm btn-outline-danger">Hủy</button>
+              <div class="d-flex gap-2 justify-content-center">
+                <button @click="xemHoaDon(hd)" class="btn btn-sm btn-info text-white fw-bold px-3">Chi tiết</button>
+                <button @click="xoaHoaDon(hd.id)" class="btn btn-sm btn-outline-danger px-3">Xóa</button>
               </div>
             </td>
           </tr>
-          <tr v-if="dsHoaDon.length === 0"><td colspan="7" class="text-center py-4 text-muted">Chưa có đơn hàng nào trên hệ thống.</td></tr>
+          <tr v-if="dsHoaDon.length === 0"><td colspan="6" class="text-center py-4 text-muted">Chưa có đơn hàng nào trên hệ thống.</td></tr>
         </tbody>
       </table>
     </div>
+
   </div>
 </template>

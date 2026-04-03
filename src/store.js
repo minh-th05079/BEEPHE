@@ -1,126 +1,306 @@
 import { ref, computed } from 'vue'
 
 // ==========================================
-// THIẾT LẬP MOCKAPI (ĐÃ CHUẨN HÓA LINK HÓA ĐƠN)
+// THIẾT LẬP MOCKAPI
 // ==========================================
 const API_SANPHAM = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/sanpham'
 const API_USERS = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/users'
-const API_HOADON = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/hoadon'
+const API_DANHMUC = 'https://698042e46570ee87d50e8e0c.mockapi.io/danhmuc'
+
+// Đã cập nhật link MockAPI mới cho Hóa Đơn theo yêu cầu
+const API_HOADON = 'https://698042e46570ee87d50e8e0c.mockapi.io/hoadon'
 
 const matchId = (id1, id2) => String(id1) === String(id2)
 
 export const currentView = ref('login')
 export const adminTab = ref('san-pham')
-export const username = ref('') 
+export const username = ref('')
 export const password = ref('')
 
+// ==========================================
 // 1. QUẢN LÝ DANH MỤC & TÌM KIẾM
-export const activeCategory = ref('all') 
-export const searchQuery = ref('') 
+// ==========================================
+export const activeCategory = ref('all')
+export const searchQuery = ref('')
 
-export const dsDanhMuc = ref([{ id: 'tra-sua', name: 'Trà Sữa' }, { id: 'cafe', name: 'Cafe' }])
-export const showFormDM = ref(false); export const isEditDM = ref(false); export const formDM = ref({ id: '', name: '' })
-export const huyFormDM = () => { showFormDM.value = false; isEditDM.value = false; formDM.value = { id: '', name: '' } }
-export const luuDanhMuc = () => {
-  if (!formDM.value.id || !formDM.value.name) return alert('Vui lòng nhập đủ thông tin!')
-  if (!isEditDM.value && dsDanhMuc.value.find(d => d.id === formDM.value.id)) return alert('Mã đã tồn tại!')
-  if (isEditDM.value) { const idx = dsDanhMuc.value.findIndex(d => d.id === formDM.value.id); if (idx !== -1) dsDanhMuc.value[idx] = { ...formDM.value } } 
-  else { dsDanhMuc.value.push({ ...formDM.value }) }
-  huyFormDM()
+export const dsDanhMuc = ref([])
+export const showFormDM = ref(false)
+export const isEditDM = ref(false)
+export const formDM = ref({ id: '', name: '' })
+
+export const huyFormDM = () => {
+  showFormDM.value = false
+  isEditDM.value = false
+  formDM.value = { id: '', name: '' }
 }
-export const xoaDanhMuc = (id) => { dsDanhMuc.value = dsDanhMuc.value.filter(d => d.id !== id) }
-export const suaDanhMuc = (dm) => { showFormDM.value = true; isEditDM.value = true; formDM.value = { ...dm } }
 
-// 2. QUẢN LÝ SẢN PHẨM & TỒN KHO 
-export const adminSanPhams = ref([]) 
+export const layDuLieuDanhMuc = async () => {
+  try {
+    const res = await fetch(API_DANHMUC)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) dsDanhMuc.value = data
+    }
+  } catch (e) {
+    console.log('Lỗi tải danh mục:', e)
+  }
+}
+layDuLieuDanhMuc()
+
+export const luuDanhMuc = async () => {
+  if (!formDM.value.name) return alert('Vui lòng nhập tên danh mục!')
+
+  const isEdit = isEditDM.value
+  const data = { name: formDM.value.name }
+
+  if (!isEdit && formDM.value.id) data.id = formDM.value.id
+
+  try {
+    const res = await fetch(isEdit ? `${API_DANHMUC}/${formDM.value.id}` : API_DANHMUC, {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+
+    if (res.ok) {
+      await layDuLieuDanhMuc()
+      huyFormDM()
+    } else {
+      alert('Lỗi khi lưu danh mục trên API!')
+    }
+  } catch (e) {
+    alert('Lỗi mạng!')
+  }
+}
+
+export const xoaDanhMuc = async (id) => {
+  if (!confirm('Bạn có chắc muốn xóa danh mục này?')) return
+  try {
+    const res = await fetch(`${API_DANHMUC}/${id}`, { method: 'DELETE' })
+    if (res.ok) await layDuLieuDanhMuc()
+  } catch (e) {
+    alert('Lỗi khi xóa danh mục!')
+  }
+}
+
+export const suaDanhMuc = (dm) => {
+  showFormDM.value = true
+  isEditDM.value = true
+  formDM.value = { ...dm }
+}
+
+// ==========================================
+// 2. QUẢN LÝ SẢN PHẨM & TỒN KHO
+// ==========================================
+export const adminSanPhams = ref([])
 
 export const filteredProducts = computed(() => {
   if (!Array.isArray(adminSanPhams.value)) return []
   let result = adminSanPhams.value
-  if (activeCategory.value !== 'all') result = result.filter(sp => String(sp.category) === String(activeCategory.value))
+  if (activeCategory.value !== 'all')
+    result = result.filter((sp) => String(sp.category) === String(activeCategory.value))
   if (searchQuery.value.trim() !== '') {
     const keyword = searchQuery.value.toLowerCase().trim()
-    result = result.filter(sp => sp.name.toLowerCase().includes(keyword))
+    result = result.filter((sp) => sp.name.toLowerCase().includes(keyword))
   }
   return result
 })
 
-export const showFormSP = ref(false); export const isEditSP = ref(false)
+export const showFormSP = ref(false)
+export const isEditSP = ref(false)
 export const formSP = ref({ id: null, name: '', price: 0, img: '', category: '', tonKho: 0 })
-export const huyFormSP = () => { showFormSP.value = false; isEditSP.value = false; formSP.value = { id: null, name: '', price: 0, img: '', category: dsDanhMuc.value[0]?.id || 'tra-sua', tonKho: 0 } }
-
-export const layDuLieuSanPham = async () => { 
-  try { const res = await fetch(API_SANPHAM); if (res.ok) { const data = await res.json(); if(Array.isArray(data)) adminSanPhams.value = data } } catch (e) {} 
+export const huyFormSP = () => {
+  showFormSP.value = false
+  isEditSP.value = false
+  formSP.value = {
+    id: null,
+    name: '',
+    price: 0,
+    img: '',
+    category: dsDanhMuc.value[0]?.id || 'tra-sua',
+    tonKho: 0,
+  }
 }
-layDuLieuSanPham() 
+
+export const layDuLieuSanPham = async () => {
+  try {
+    const res = await fetch(API_SANPHAM)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) adminSanPhams.value = data
+    }
+  } catch (e) {}
+}
+layDuLieuSanPham()
 
 export const luuSanPham = async () => {
-  if (!formSP.value.name || formSP.value.price <= 0 || formSP.value.tonKho < 0 || !formSP.value.category) return alert('Dữ liệu không hợp lệ!')
+  if (
+    !formSP.value.name ||
+    formSP.value.price <= 0 ||
+    formSP.value.tonKho < 0 ||
+    !formSP.value.category
+  )
+    return alert('Dữ liệu không hợp lệ!')
   const isEdit = isEditSP.value
-  const data = { name: formSP.value.name, price: Number(formSP.value.price), img: formSP.value.img, category: formSP.value.category, tonKho: Number(formSP.value.tonKho) }
+  const data = {
+    name: formSP.value.name,
+    price: Number(formSP.value.price),
+    img: formSP.value.img,
+    category: formSP.value.category,
+    tonKho: Number(formSP.value.tonKho),
+  }
   try {
-    const res = await fetch(isEdit ? `${API_SANPHAM}/${formSP.value.id}` : API_SANPHAM, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-    if (res.ok) { await layDuLieuSanPham(); huyFormSP() } else alert('Lỗi MockAPI!')
-  } catch (e) { alert('Lỗi mạng!') }
+    const res = await fetch(isEdit ? `${API_SANPHAM}/${formSP.value.id}` : API_SANPHAM, {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (res.ok) {
+      await layDuLieuSanPham()
+      huyFormSP()
+    } else alert('Lỗi MockAPI!')
+  } catch (e) {
+    alert('Lỗi mạng!')
+  }
 }
-export const xoaSanPham = async (id) => { if (!confirm('Xóa?')) return; try { const res = await fetch(`${API_SANPHAM}/${id}`, { method: 'DELETE' }); if (res.ok) await layDuLieuSanPham() } catch (e) {} }
-export const suaSanPham = (item) => { showFormSP.value = true; isEditSP.value = true; formSP.value = { ...item } }
 
+export const xoaSanPham = async (id) => {
+  if (!confirm('Xóa?')) return
+  try {
+    const res = await fetch(`${API_SANPHAM}/${id}`, { method: 'DELETE' })
+    if (res.ok) await layDuLieuSanPham()
+  } catch (e) {}
+}
+
+export const suaSanPham = (item) => {
+  showFormSP.value = true
+  isEditSP.value = true
+  formSP.value = { ...item }
+}
+
+// ==========================================
 // 3. QUẢN LÝ GIỎ HÀNG & SINH ĐƠN HÀNG THỰC TẾ
+// ==========================================
 export const cart = ref([])
 export const addToCart = (product) => {
   if (product.tonKho <= 0) return alert('Hết hàng!')
   const item = cart.value.find((i) => matchId(i.id, product.id) && i.name === product.name)
-  const totalThisProductInCart = cart.value.filter((i) => matchId(i.id, product.id)).reduce((sum, i) => sum + i.quantity, 0)
-  if (totalThisProductInCart >= product.tonKho) return alert(`Kho chỉ còn ${product.tonKho} sản phẩm!`)
-  if (item) { item.quantity++ } else { cart.value.push({ ...product, quantity: 1 }) }
+  const totalThisProductInCart = cart.value
+    .filter((i) => matchId(i.id, product.id))
+    .reduce((sum, i) => sum + i.quantity, 0)
+  if (totalThisProductInCart >= product.tonKho)
+    return alert(`Kho chỉ còn ${product.tonKho} sản phẩm!`)
+  if (item) {
+    item.quantity++
+  } else {
+    cart.value.push({ ...product, quantity: 1 })
+  }
 }
-export const removeFromCart = (index) => { if (cart.value[index].quantity > 1) cart.value[index].quantity--; else cart.value.splice(index, 1) }
+export const removeFromCart = (index) => {
+  if (cart.value[index].quantity > 1) cart.value[index].quantity--
+  else cart.value.splice(index, 1)
+}
 
 export const handleCheckout = async () => {
   if (cart.value.length === 0) return
   try {
-    // 1. Trừ tồn kho trên hệ thống
     for (const item of cart.value) {
-      const sp = adminSanPhams.value.find(s => s.id === item.id)
-      if (sp) await fetch(`${API_SANPHAM}/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tonKho: sp.tonKho - item.quantity }) })
+      const sp = adminSanPhams.value.find((s) => s.id === item.id)
+      if (sp)
+        await fetch(`${API_SANPHAM}/${item.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tonKho: sp.tonKho - item.quantity }),
+        })
     }
-    
-    // 2. TẠO ĐƠN HÀNG MỚI ĐẨY LÊN API HÓA ĐƠN
+
+    // Cập nhật lưu toàn bộ thông tin giỏ hàng vào đơn
     const newOrder = {
       ngay: new Date().toLocaleString('vi-VN'),
       khachId: currentUserProfile.value.id || 'guest',
       khach: currentUserProfile.value.user || 'Khách vãng lai',
+      sdt: currentUserProfile.value.phone || 'Không có',
+      email: currentUserProfile.value.email || 'Không có',
       tong: totalAmount.value,
-      trangThai: 'Chờ xác nhận', // Trạng thái ban đầu
-      chiTiet: cart.value.map(i => `${i.name} (SL: ${i.quantity})`).join(', ') // Lưu lại món khách mua
+      trangThai: 'Chờ xác nhận',
+      chiTiet: cart.value.map((i) => `${i.name} (SL: ${i.quantity})`).join(', '),
+      danhSachMon: cart.value, // Mảng lưu toàn bộ detail cho Admin
     }
-    await fetch(API_HOADON, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOrder) })
+
+    await fetch(API_HOADON, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newOrder),
+    })
 
     await layDuLieuSanPham()
-    await layDuLieuHoaDon() // Load lại bảng hóa đơn
+    await layDuLieuHoaDon()
     alert('Đặt hàng thành công! Vui lòng vào Lịch sử đơn hàng để theo dõi tiến độ.')
     cart.value = []
-  } catch(e) { alert('Lỗi xử lý đơn hàng!') }
+  } catch (e) {
+    alert('Lỗi xử lý đơn hàng!')
+  }
 }
-export const totalAmount = computed(() => { if (!Array.isArray(cart.value)) return 0; return cart.value.reduce((t, i) => t + i.price * i.quantity, 0) })
-export const totalItemsInCart = computed(() => { if (!Array.isArray(cart.value)) return 0; return cart.value.reduce((t, i) => t + i.quantity, 0) })
 
+export const totalAmount = computed(() => {
+  if (!Array.isArray(cart.value)) return 0
+  return cart.value.reduce((t, i) => t + i.price * i.quantity, 0)
+})
+export const totalItemsInCart = computed(() => {
+  if (!Array.isArray(cart.value)) return 0
+  return cart.value.reduce((t, i) => t + i.quantity, 0)
+})
+
+// ==========================================
 // 4. LOGIC TÀI KHOẢN
-export const regUsername = ref(''); export const regEmail = ref(''); export const regPhone = ref(''); export const regPassword = ref(''); export const regConfirmPassword = ref(''); 
+// ==========================================
+export const regUsername = ref('')
+export const regEmail = ref('')
+export const regPhone = ref('')
+export const regPassword = ref('')
+export const regConfirmPassword = ref('')
 export const registeredUsers = ref([])
 export const currentUserProfile = ref({ id: null, user: '', phone: '', email: '', pass: '' })
 
-export const layDuLieuUsers = async () => { try { const res = await fetch(API_USERS); if (res.ok) { const data = await res.json(); if(Array.isArray(data)) registeredUsers.value = data } } catch (e) {} }
-layDuLieuUsers() 
+export const layDuLieuUsers = async () => {
+  try {
+    const res = await fetch(API_USERS)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) registeredUsers.value = data
+    }
+  } catch (e) {}
+}
+layDuLieuUsers()
 
 export const handleRegister = async () => {
-  if (!regUsername.value || !regEmail.value || !regPhone.value || !regPassword.value) return alert('Vui lòng nhập đủ thông tin!')
+  if (!regUsername.value || !regEmail.value || !regPhone.value || !regPassword.value)
+    return alert('Vui lòng nhập đủ thông tin!')
   if (!Array.isArray(registeredUsers.value)) return alert('Đang tải dữ liệu, vui lòng thử lại!')
-  if (registeredUsers.value.find(u => u.user === regUsername.value || u.email === regEmail.value || u.phone === regPhone.value)) return alert('Thông tin đã tồn tại!')
+  if (
+    registeredUsers.value.find(
+      (u) =>
+        u.user === regUsername.value || u.email === regEmail.value || u.phone === regPhone.value,
+    )
+  )
+    return alert('Thông tin đã tồn tại!')
   try {
-    const res = await fetch(API_USERS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: regUsername.value, pass: regPassword.value, email: regEmail.value, phone: regPhone.value, isBlacklisted: false }) })
-    if (res.ok) { alert('Đăng ký thành công!'); await layDuLieuUsers(); currentView.value = 'login' }
+    const res = await fetch(API_USERS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: regUsername.value,
+        pass: regPassword.value,
+        email: regEmail.value,
+        phone: regPhone.value,
+        isBlacklisted: false,
+      }),
+    })
+    if (res.ok) {
+      alert('Đăng ký thành công!')
+      await layDuLieuUsers()
+      currentView.value = 'login'
+    }
   } catch (error) {}
 }
 
@@ -128,84 +308,196 @@ export const handleLogin = () => {
   const uName = String(username.value).trim()
   const uPass = String(password.value).trim()
   if (!Array.isArray(registeredUsers.value)) registeredUsers.value = []
-  
-  const isNewUser = registeredUsers.value.find(u => (String(u.user) === uName || String(u.email) === uName || String(u.phone) === uName) && String(u.pass) === uPass)
 
-  if (uName === 'admin' && uPass === '123') { currentView.value = 'admin' } 
-  else if (isNewUser) { 
-    if (isNewUser.isBlacklisted) return alert('🚫 TÀI KHOẢN CỦA BẠN ĐÃ BỊ KHÓA! Vui lòng liên hệ Admin.')
-    currentUserProfile.value = { ...isNewUser }; currentView.value = 'client' 
-  } 
-  else if (uName === 'kh123' && uPass === '123') {
-    currentUserProfile.value = { id: 'test', user: 'Khách Test', phone: '0912345678', email: 'test@gmail.com', pass: '123' }; currentView.value = 'client'
+  const isNewUser = registeredUsers.value.find(
+    (u) =>
+      (String(u.user) === uName || String(u.email) === uName || String(u.phone) === uName) &&
+      String(u.pass) === uPass,
+  )
+
+  if (uName === 'admin' && uPass === '123') {
+    currentView.value = 'admin'
+  } else if (isNewUser) {
+    if (isNewUser.isBlacklisted)
+      return alert('🚫 TÀI KHOẢN CỦA BẠN ĐÃ BỊ KHÓA! Vui lòng liên hệ Admin.')
+    currentUserProfile.value = { ...isNewUser }
+    currentView.value = 'client'
+  } else if (uName === 'kh123' && uPass === '123') {
+    currentUserProfile.value = {
+      id: 'test',
+      user: 'Khách Test',
+      phone: '0912345678',
+      email: 'test@gmail.com',
+      pass: '123',
+    }
+    currentView.value = 'client'
+  } else {
+    alert('Sai thông tin tài khoản hoặc mật khẩu!')
   }
-  else { alert('Sai thông tin tài khoản hoặc mật khẩu!') }
 }
-export const handleLogout = () => { if (confirm('Đăng xuất?')) { currentView.value = 'login'; username.value = ''; password.value = ''; currentUserProfile.value = { id: null, user: '', phone: '', email: '', pass: '' } } }
 
+export const handleLogout = () => {
+  if (confirm('Đăng xuất?')) {
+    currentView.value = 'login'
+    username.value = ''
+    password.value = ''
+    currentUserProfile.value = { id: null, user: '', phone: '', email: '', pass: '' }
+  }
+}
+
+// ==========================================
 // 5. ADMIN KHÁCH HÀNG (BLACKLIST)
+// ==========================================
 export const showDetailKH = ref(false)
 export const selectedKH = ref({ id: null, user: '', email: '', phone: '', isBlacklisted: false })
-export const dongChiTietKH = () => { showDetailKH.value = false; selectedKH.value = { id: null, user: '', email: '', phone: '', isBlacklisted: false } }
-export const xemKhachHang = (item) => { showDetailKH.value = true; selectedKH.value = { ...item } }
+
+export const dongChiTietKH = () => {
+  showDetailKH.value = false
+  selectedKH.value = { id: null, user: '', email: '', phone: '', isBlacklisted: false }
+}
+
+export const xemKhachHang = (item) => {
+  showDetailKH.value = true
+  selectedKH.value = { ...item }
+}
+
 export const toggleBlacklist = async (user) => {
-  const newStatus = !user.isBlacklisted; const actionName = newStatus ? 'KHÓA' : 'MỞ KHÓA';
-  if (!confirm(`Xác nhận ${actionName} tài khoản "${user.user}"?`)) return;
+  const newStatus = !user.isBlacklisted
+  const actionName = newStatus ? 'KHÓA' : 'MỞ KHÓA'
+  if (!confirm(`Xác nhận ${actionName} tài khoản "${user.user}"?`)) return
   try {
-    const res = await fetch(`${API_USERS}/${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isBlacklisted: newStatus }) })
-    if (res.ok) { await layDuLieuUsers(); alert('Thành công!'); if (showDetailKH.value) dongChiTietKH() }
-  } catch (e) { alert('Lỗi kết nối mạng!') }
+    const res = await fetch(`${API_USERS}/${user.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isBlacklisted: newStatus }),
+    })
+    if (res.ok) {
+      await layDuLieuUsers()
+      alert('Thành công!')
+      if (showDetailKH.value) dongChiTietKH()
+    }
+  } catch (e) {
+    alert('Lỗi kết nối mạng!')
+  }
 }
 
 // ==========================================
-// 6. QUẢN LÝ ĐƠN HÀNG (CẬP NHẬT TRẠNG THÁI)
+// 6. QUẢN LÝ ĐƠN HÀNG (ADMIN CHỈ XEM VÀ XÓA)
 // ==========================================
 export const dsHoaDon = ref([])
+export const showDetailHD = ref(false)
+export const selectedHD = ref(null)
+
+export const xemHoaDon = (hd) => {
+  selectedHD.value = hd
+  showDetailHD.value = true
+}
+
+export const dongChiTietHD = () => {
+  showDetailHD.value = false
+  selectedHD.value = null
+}
 
 export const layDuLieuHoaDon = async () => {
   try {
     const res = await fetch(API_HOADON)
     if (res.ok) {
       const data = await res.json()
-      // Đảo ngược mảng để đơn hàng mới nhất hiện lên trên cùng
       if (Array.isArray(data)) dsHoaDon.value = data.reverse()
     }
   } catch (e) {}
 }
-layDuLieuHoaDon() // Gọi ngay khi web tải
+layDuLieuHoaDon()
 
 export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
+  // Vẫn giữ lại cho Khách hàng hủy đơn trong Profile
   if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return
   try {
     const res = await fetch(`${API_HOADON}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trangThai: trangThaiMoi })
+      body: JSON.stringify({ trangThai: trangThaiMoi }),
     })
     if (res.ok) {
       await layDuLieuHoaDon()
     }
-  } catch(e) { alert('Lỗi kết nối!') }
+  } catch (e) {
+    alert('Lỗi kết nối!')
+  }
 }
 
-// 7. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
-export const handleUpdateProfile = async () => {
-  if (!currentUserProfile.value.user || !currentUserProfile.value.phone) return alert('Vui lòng điền đủ thông tin!')
+export const xoaHoaDon = async (id) => {
+  if (!confirm('Hành động này sẽ XÓA VĨNH VIỄN hóa đơn. Bạn có chắc chắn?')) return
   try {
-    const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: currentUserProfile.value.user, phone: currentUserProfile.value.phone, email: currentUserProfile.value.email }) })
-    if (res.ok) { alert('Cập nhật thông tin lên hệ thống thành công!'); await layDuLieuUsers(); currentView.value = 'client' }
-  } catch (e) { alert('Lỗi kết nối MockAPI!') }
+    const res = await fetch(`${API_HOADON}/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      await layDuLieuHoaDon()
+      dongChiTietHD()
+    }
+  } catch (e) {
+    alert('Lỗi kết nối khi xóa hóa đơn!')
+  }
 }
-export const oldPassword = ref(''); export const newPassword = ref(''); export const confirmNewPassword = ref('')
+
+// ==========================================
+// 7. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
+// ==========================================
+export const handleUpdateProfile = async () => {
+  if (!currentUserProfile.value.user || !currentUserProfile.value.phone)
+    return alert('Vui lòng điền đủ thông tin!')
+  try {
+    const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: currentUserProfile.value.user,
+        phone: currentUserProfile.value.phone,
+        email: currentUserProfile.value.email,
+      }),
+    })
+    if (res.ok) {
+      alert('Cập nhật thông tin lên hệ thống thành công!')
+      await layDuLieuUsers()
+      currentView.value = 'client'
+    }
+  } catch (e) {
+    alert('Lỗi kết nối MockAPI!')
+  }
+}
+
+export const oldPassword = ref('')
+export const newPassword = ref('')
+export const confirmNewPassword = ref('')
+
 export const handleChangePassword = async () => {
-  if (!oldPassword.value || !newPassword.value || !confirmNewPassword.value) return alert('Nhập đủ thông tin!')
-  if (oldPassword.value !== currentUserProfile.value.pass) return alert('Mật khẩu cũ không chính xác!')
+  if (!oldPassword.value || !newPassword.value || !confirmNewPassword.value)
+    return alert('Nhập đủ thông tin!')
+  if (oldPassword.value !== currentUserProfile.value.pass)
+    return alert('Mật khẩu cũ không chính xác!')
   if (newPassword.value.length < 6) return alert('Mật khẩu mới phải từ 6 ký tự!')
   if (newPassword.value !== confirmNewPassword.value) return alert('Mật khẩu xác nhận không khớp!')
   try {
-    const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pass: newPassword.value }) })
-    if (res.ok) { alert('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.'); oldPassword.value = ''; newPassword.value = ''; confirmNewPassword.value = ''; await layDuLieuUsers(); handleLogout() }
-  } catch (e) { alert('Lỗi kết nối MockAPI!') }
+    const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pass: newPassword.value }),
+    })
+    if (res.ok) {
+      alert('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.')
+      oldPassword.value = ''
+      newPassword.value = ''
+      confirmNewPassword.value = ''
+      await layDuLieuUsers()
+      handleLogout()
+    }
+  } catch (e) {
+    alert('Lỗi kết nối MockAPI!')
+  }
 }
+
 export const forgotEmail = ref('')
-export const handleForgotPassword = () => { alert(`Đã gửi yêu cầu vào "${forgotEmail.value}".`); currentView.value = 'login'; forgotEmail.value = '' }
+export const handleForgotPassword = () => {
+  alert(`Đã gửi yêu cầu vào "${forgotEmail.value}".`)
+  currentView.value = 'login'
+  forgotEmail.value = ''
+}
