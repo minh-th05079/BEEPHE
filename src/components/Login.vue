@@ -6,6 +6,7 @@ import { username, password, handleLogin, currentView } from '../store.js'
   <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow p-4 bg-white" style="width: 400px;">
       <h3 class="text-center mb-4 text-primary fw-bold">BEEPHE Login</h3>
+    
       <div class="alert alert-info py-2" style="font-size: 0.9rem">
         <small><b>Khách:</b> kh123 / 123</small><br>
         <small><b>Admin:</b> admin / 123</small>
@@ -29,6 +30,9 @@ import { username, password, handleLogin, currentView } from '../store.js'
         </button>
         <button @click="currentView = 'forgot-password'" class="btn btn-link text-decoration-none text-danger p-0 d-block w-100 fw-bold">
           Quên mật khẩu?
+        </button>
+        <button @click="currentView = 'client'" class="btn btn-link text-decoration-none text-secondary p-0 mt-3 d-block w-100 small">
+          ← Về trang chủ
         </button>
       </div>
     </div>

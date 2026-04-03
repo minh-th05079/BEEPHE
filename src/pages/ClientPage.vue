@@ -7,6 +7,7 @@ const selectedProduct = ref(null)
 const selectedSize = ref('M')
 const selectedTemp = ref('Lạnh')
 const selectedIce = ref('Bình thường')
+const selectedQuantity = ref(1) 
 
 const currentPrice = computed(() => {
   if (!selectedProduct.value) return 0
@@ -21,6 +22,23 @@ const openDetail = (item) => {
   selectedSize.value = 'M' 
   selectedTemp.value = 'Lạnh'
   selectedIce.value = 'Bình thường'
+  selectedQuantity.value = 1 
+}
+
+// Hàm giảm số lượng
+const decreaseQuantity = () => {
+  if (selectedQuantity.value > 1) {
+    selectedQuantity.value--
+  }
+}
+
+// Hàm tăng số lượng
+const increaseQuantity = () => {
+  if (selectedProduct.value && selectedQuantity.value < selectedProduct.value.tonKho) {
+    selectedQuantity.value++
+  } else {
+    alert('Vượt quá số lượng tồn kho!')
+  }
 }
 
 const confirmAddToCart = () => {
@@ -34,7 +52,7 @@ const confirmAddToCart = () => {
     price: currentPrice.value 
   }
 
-  addToCart(customItem)
+  addToCart(customItem, selectedQuantity.value)
   selectedProduct.value = null 
 }
 </script>
@@ -134,7 +152,7 @@ const confirmAddToCart = () => {
               
               <h2 class="fw-bold text-dark mb-1">{{ selectedProduct.name }}</h2>
               <h3 class="text-primary fw-bold mb-3">{{ currentPrice.toLocaleString() }} VNĐ</h3>
-              
+               
               <div class="mb-4 bg-light p-3 rounded-3 border border-warning">
                 <h6 class="fw-bold mb-3 text-dark border-bottom pb-2">⚙️ Tùy chỉnh đồ uống:</h6>
                 <div class="mb-3">
@@ -170,15 +188,24 @@ const confirmAddToCart = () => {
                 <span v-else class="text-danger fw-bold fs-5">❌ Đã hết nguyên liệu</span>
               </div>
               
+              <div v-if="selectedProduct.tonKho > 0" class="d-flex align-items-center mb-4">
+                <span class="fw-bold me-3 text-dark">Số lượng:</span>
+                <div class="input-group input-group-lg" style="width: 150px;">
+                  <button @click="decreaseQuantity" class="btn btn-outline-secondary fw-bold">-</button>
+                  <input type="text" class="form-control text-center fw-bold bg-white" :value="selectedQuantity" readonly>
+                  <button @click="increaseQuantity" class="btn btn-outline-secondary fw-bold">+</button>
+                </div>
+              </div>
+              
               <button 
                 @click="confirmAddToCart" 
                 :class="['btn btn-lg w-100 fw-bold shadow-sm py-3', selectedProduct.tonKho > 0 ? 'btn-primary' : 'btn-secondary']"
                 :disabled="selectedProduct.tonKho <= 0"
               >
-                {{ selectedProduct.tonKho > 0 ? `🛒 THÊM VÀO GIỎ - ${currentPrice.toLocaleString()}đ` : 'TẠM THỜI KHÔNG THỂ MUA' }}
+                {{ selectedProduct.tonKho > 0 ? `🛒 THÊM VÀO GIỎ - ${(currentPrice * selectedQuantity).toLocaleString()}đ` : 'TẠM THỜI KHÔNG THỂ MUA' }}
               </button>
               
-            </div>
+             </div>
           </div>
         </div>
       </div>

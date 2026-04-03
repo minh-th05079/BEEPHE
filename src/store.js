@@ -6,13 +6,11 @@ import { ref, computed } from 'vue'
 const API_SANPHAM = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/sanpham'
 const API_USERS = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/users'
 const API_DANHMUC = 'https://698042e46570ee87d50e8e0c.mockapi.io/danhmuc'
-
-// Đã cập nhật link MockAPI mới cho Hóa Đơn theo yêu cầu
 const API_HOADON = 'https://698042e46570ee87d50e8e0c.mockapi.io/hoadon'
 
 const matchId = (id1, id2) => String(id1) === String(id2)
 
-export const currentView = ref('login')
+export const currentView = ref('client')
 export const adminTab = ref('san-pham')
 export const username = ref('')
 export const password = ref('')
@@ -182,27 +180,59 @@ export const suaSanPham = (item) => {
 // 3. QUẢN LÝ GIỎ HÀNG & SINH ĐƠN HÀNG THỰC TẾ
 // ==========================================
 export const cart = ref([])
-export const addToCart = (product) => {
+
+export const addToCart = (product, qty = 1) => {
   if (product.tonKho <= 0) return alert('Hết hàng!')
   const item = cart.value.find((i) => matchId(i.id, product.id) && i.name === product.name)
+  
   const totalThisProductInCart = cart.value
     .filter((i) => matchId(i.id, product.id))
     .reduce((sum, i) => sum + i.quantity, 0)
-  if (totalThisProductInCart >= product.tonKho)
+    
+  if (totalThisProductInCart + qty > product.tonKho)
     return alert(`Kho chỉ còn ${product.tonKho} sản phẩm!`)
+    
   if (item) {
-    item.quantity++
+    item.quantity += qty
   } else {
-    cart.value.push({ ...product, quantity: 1 })
+    cart.value.push({ ...product, quantity: qty })
   }
 }
-export const removeFromCart = (index) => {
-  if (cart.value[index].quantity > 1) cart.value[index].quantity--
-  else cart.value.splice(index, 1)
+
+export const increaseCartItem = (index) => {
+  const item = cart.value[index]
+  const spGoc = adminSanPhams.value.find((s) => matchId(s.id, item.id))
+  const totalThisProductInCart = cart.value
+    .filter((i) => matchId(i.id, item.id))
+    .reduce((sum, i) => sum + i.quantity, 0)
+
+  if (spGoc && totalThisProductInCart >= spGoc.tonKho) {
+    return alert(`Kho chỉ còn ${spGoc.tonKho} sản phẩm!`)
+  }
+  item.quantity++
+}
+
+export const decreaseCartItem = (index) => {
+  if (cart.value[index].quantity > 1) {
+    cart.value[index].quantity--
+  } else {
+    cart.value.splice(index, 1)
+  }
+}
+
+export const removeCartItem = (index) => {
+  cart.value.splice(index, 1)
 }
 
 export const handleCheckout = async () => {
   if (cart.value.length === 0) return
+  
+  if (!currentUserProfile.value.id) {
+    alert('Vui lòng đăng nhập để tiến hành đặt món và theo dõi đơn hàng!')
+    currentView.value = 'login'
+    return
+  }
+
   try {
     for (const item of cart.value) {
       const sp = adminSanPhams.value.find((s) => s.id === item.id)
@@ -214,7 +244,6 @@ export const handleCheckout = async () => {
         })
     }
 
-    // Cập nhật lưu toàn bộ thông tin giỏ hàng vào đơn
     const newOrder = {
       ngay: new Date().toLocaleString('vi-VN'),
       khachId: currentUserProfile.value.id || 'guest',
@@ -224,7 +253,7 @@ export const handleCheckout = async () => {
       tong: totalAmount.value,
       trangThai: 'Chờ xác nhận',
       chiTiet: cart.value.map((i) => `${i.name} (SL: ${i.quantity})`).join(', '),
-      danhSachMon: cart.value, // Mảng lưu toàn bộ detail cho Admin
+      danhSachMon: cart.value, 
     }
 
     await fetch(API_HOADON, {
@@ -338,7 +367,7 @@ export const handleLogin = () => {
 
 export const handleLogout = () => {
   if (confirm('Đăng xuất?')) {
-    currentView.value = 'login'
+    currentView.value = 'client' 
     username.value = ''
     password.value = ''
     currentUserProfile.value = { id: null, user: '', phone: '', email: '', pass: '' }
@@ -346,10 +375,11 @@ export const handleLogout = () => {
 }
 
 // ==========================================
-// 5. ADMIN KHÁCH HÀNG (BLACKLIST)
+// 5. ADMIN KHÁCH HÀNG (BLACKLIST & TÌM KIẾM)
 // ==========================================
 export const showDetailKH = ref(false)
 export const selectedKH = ref({ id: null, user: '', email: '', phone: '', isBlacklisted: false })
+export const searchKhachHang = ref('') // Biến lưu từ khóa tìm kiếm khách
 
 export const dongChiTietKH = () => {
   showDetailKH.value = false
@@ -381,8 +411,19 @@ export const toggleBlacklist = async (user) => {
   }
 }
 
+// Lọc khách hàng theo từ khóa (Tìm theo Tên, Email hoặc Số điện thoại)
+export const filteredKhachHang = computed(() => {
+  if (!searchKhachHang.value.trim()) return registeredUsers.value;
+  const keyword = searchKhachHang.value.toLowerCase().trim();
+  return registeredUsers.value.filter(kh => 
+    String(kh.user).toLowerCase().includes(keyword) || 
+    String(kh.email).toLowerCase().includes(keyword) || 
+    String(kh.phone || '').toLowerCase().includes(keyword)
+  );
+})
+
 // ==========================================
-// 6. QUẢN LÝ ĐƠN HÀNG (ADMIN CHỈ XEM VÀ XÓA)
+// 6. QUẢN LÝ ĐƠN HÀNG
 // ==========================================
 export const dsHoaDon = ref([])
 export const showDetailHD = ref(false)
@@ -410,8 +451,7 @@ export const layDuLieuHoaDon = async () => {
 layDuLieuHoaDon()
 
 export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
-  // Vẫn giữ lại cho Khách hàng hủy đơn trong Profile
-  if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return
+  if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return false
   try {
     const res = await fetch(`${API_HOADON}/${id}`, {
       method: 'PUT',
@@ -420,23 +460,12 @@ export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
     })
     if (res.ok) {
       await layDuLieuHoaDon()
+      return true
     }
   } catch (e) {
     alert('Lỗi kết nối!')
   }
-}
-
-export const xoaHoaDon = async (id) => {
-  if (!confirm('Hành động này sẽ XÓA VĨNH VIỄN hóa đơn. Bạn có chắc chắn?')) return
-  try {
-    const res = await fetch(`${API_HOADON}/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      await layDuLieuHoaDon()
-      dongChiTietHD()
-    }
-  } catch (e) {
-    alert('Lỗi kết nối khi xóa hóa đơn!')
-  }
+  return false
 }
 
 // ==========================================

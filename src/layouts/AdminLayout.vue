@@ -13,6 +13,10 @@ import { adminTab, handleLogout } from '../store.js'
       <aside class="sidebar bg-dark text-white p-3 shadow" style="width: 250px;">
         <ul class="nav flex-column gap-2 mt-2">
           <li class="nav-item">
+            <button @click="adminTab = 'thong-ke'" :class="['btn w-100 text-start text-white fw-bold', adminTab === 'thong-ke' ? 'btn-primary' : '']">📊 Thống kê Doanh thu</button>
+          </li>
+          
+          <li class="nav-item">
             <button @click="adminTab = 'danh-muc'" :class="['btn w-100 text-start text-white', adminTab === 'danh-muc' ? 'btn-primary' : '']">🗂️ Quản lý Danh mục</button>
           </li>
           <li class="nav-item">

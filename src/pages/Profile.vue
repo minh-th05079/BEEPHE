@@ -3,7 +3,8 @@ import { computed, onMounted } from 'vue'
 import { 
   currentUserProfile, handleUpdateProfile,
   oldPassword, newPassword, confirmNewPassword, handleChangePassword,
-  dsHoaDon, layDuLieuHoaDon, capNhatTrangThaiHoaDon
+  dsHoaDon, layDuLieuHoaDon, capNhatTrangThaiHoaDon,
+  handleLogout // <-- Đã import hàm Đăng xuất từ store
 } from '../store.js'
 
 // Load lại danh sách hóa đơn mới nhất khi khách vào trang cá nhân
@@ -22,6 +23,7 @@ const myOrders = computed(() => {
     <div class="row g-4">
       
       <div class="col-lg-4">
+    
         <div class="card shadow-sm border-0 mb-4 bg-white">
           <div class="card-header bg-primary text-white fw-bold py-3">👤 Thông tin cá nhân</div>
           <div class="card-body p-4">
@@ -41,9 +43,14 @@ const myOrders = computed(() => {
             <button @click="handleChangePassword" class="btn btn-warning text-dark w-100 fw-bold">Cập nhật mật khẩu</button>
           </div>
         </div>
+
+        <button @click="handleLogout" class="btn btn-danger w-100 fw-bold py-2 mt-4 shadow-sm">
+          🚪 Đăng xuất khỏi tài khoản
+        </button>
       </div>
 
       <div class="col-lg-8">
+  
         <div class="card shadow-sm border-0 bg-white h-100">
           <div class="card-header bg-success text-white fw-bold py-3 d-flex justify-content-between align-items-center">
             <span>📦 Lịch sử Đơn hàng của tôi</span>
@@ -51,6 +58,7 @@ const myOrders = computed(() => {
           </div>
           
           <div class="card-body p-0">
+  
             <div class="table-responsive">
               <table class="table table-hover align-middle m-0">
                 <thead class="table-light">
@@ -70,6 +78,7 @@ const myOrders = computed(() => {
                     <td><small>{{ hd.chiTiet }}</small></td>
                     <td class="text-danger fw-bold">{{ Number(hd.tong).toLocaleString() }}đ</td>
                     
+                  
                     <td>
                       <span v-if="hd.trangThai === 'Chờ xác nhận'" class="badge bg-warning text-dark">Chờ xác nhận</span>
                       <span v-else-if="hd.trangThai === 'Đang làm'" class="badge bg-info">Đang pha chế</span>
@@ -78,6 +87,7 @@ const myOrders = computed(() => {
                       <span v-else-if="hd.trangThai === 'Đã hủy'" class="badge bg-danger">Đã hủy</span>
                     </td>
                     
+        
                     <td class="text-center pe-4">
                       <button 
                         v-if="hd.trangThai === 'Chờ xác nhận'" 
