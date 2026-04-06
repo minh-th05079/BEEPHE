@@ -28,6 +28,9 @@ import { adminTab, handleLogout } from '../store.js'
           <li class="nav-item">
             <button @click="adminTab = 'khach-hang'" :class="['btn w-100 text-start text-white', adminTab === 'khach-hang' ? 'btn-primary' : '']">👥 Quản lý Khách hàng</button>
           </li>
+          <li class="nav-item">
+            <button @click="adminTab = 'ma-giam-gia'" :class="['btn w-100 text-start text-white', adminTab === 'ma-giam-gia' ? 'btn-primary' : '']">🎟️ Quản lý Mã giảm giá</button>
+          </li>
         </ul>
       </aside>
 

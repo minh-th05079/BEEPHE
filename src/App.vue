@@ -8,6 +8,7 @@ import ForgotPassword from './components/ForgotPassword.vue'
 import ClientLayout from './layouts/ClientLayout.vue'
 import ClientPage from './pages/ClientPage.vue'
 import Profile from './pages/Profile.vue' 
+import Checkout from './pages/Checkout.vue' // Import thêm Checkout
 
 import AdminLayout from './layouts/AdminLayout.vue'
 import AdminPage from './pages/AdminPage.vue'
@@ -18,12 +19,10 @@ import AdminPage from './pages/AdminPage.vue'
   <Register v-else-if="currentView === 'register'" /> 
   <ForgotPassword v-else-if="currentView === 'forgot-password'" /> 
 
-  <ClientLayout v-else-if="currentView === 'client'">
-    <ClientPage />
-  </ClientLayout>
-  
-  <ClientLayout v-else-if="currentView === 'profile'"> 
-    <Profile />
+  <ClientLayout v-else-if="currentView === 'client' || currentView === 'checkout' || currentView === 'profile'">
+    <ClientPage v-if="currentView === 'client'" />
+    <Checkout v-if="currentView === 'checkout'" /> 
+    <Profile v-if="currentView === 'profile'" />
   </ClientLayout>
 
   <AdminLayout v-else-if="currentView === 'admin'">
@@ -48,29 +47,29 @@ body {
 /* Ghi đè màu mặc định của Bootstrap */
 .bg-primary, .bg-success, .bg-dark { 
   background-color: var(--brown-dark) !important; 
-  color: var(--honey-yellow) !important; 
+  color: var(--honey-yellow) !important;
 }
 .btn-primary, .btn-success, .btn-warning { 
   background-color: var(--honey-yellow) !important; 
   border-color: var(--honey-dark) !important; 
   color: var(--brown-dark) !important; 
-  font-weight: bold; 
+  font-weight: bold;
 }
 .btn-primary:hover, .btn-success:hover, .btn-warning:hover { 
   background-color: var(--honey-dark) !important; 
-  color: white !important; 
+  color: white !important;
 }
 .text-primary, .text-success, .text-warning { 
   color: var(--honey-dark) !important; 
 }
 .border-primary { 
-  border-color: var(--honey-yellow) !important; 
+  border-color: var(--honey-yellow) !important;
 }
 .navbar-dark .nav-link { 
   color: var(--honey-yellow) !important; 
 }
 .navbar-dark .nav-link:hover { 
-  color: white !important; 
+  color: white !important;
 }
 .card { 
   border-color: var(--honey-yellow); 

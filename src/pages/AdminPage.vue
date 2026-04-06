@@ -4,10 +4,9 @@ import {
   adminTab,
   dsDanhMuc, showFormDM, isEditDM, formDM, luuDanhMuc, xoaDanhMuc, suaDanhMuc, huyFormDM,
   adminSanPhams, showFormSP, isEditSP, formSP, luuSanPham, xoaSanPham, suaSanPham, huyFormSP,
-  registeredUsers, showDetailKH, selectedKH, xemKhachHang, dongChiTietKH, toggleBlacklist,
-  searchKhachHang, filteredKhachHang, // <-- Thêm biến lọc khách hàng vào đây
-  dsHoaDon, layDuLieuHoaDon, showDetailHD, selectedHD, xemHoaDon, dongChiTietHD,
-  capNhatTrangThaiHoaDon
+  registeredUsers, showDetailKH, selectedKH, xemKhachHang, dongChiTietKH, toggleBlacklist, searchKhachHang, filteredKhachHang,
+  dsHoaDon, layDuLieuHoaDon, showDetailHD, selectedHD, xemHoaDon, dongChiTietHD, capNhatTrangThaiHoaDon,
+  dsMaGiamGia, showFormMGG, isEditMGG, formMGG, luuMaGiamGia, xoaMaGiamGia, suaMaGiamGia, huyFormMGG
 } from '../store.js'
 
 const handleFileUpload = (event) => {
@@ -22,11 +21,8 @@ const handleFileUpload = (event) => {
 const handleStatusChange = async (hd, event) => {
   const trangThaiMoi = event.target.value;
   const originalValue = hd.trangThai;
-  
   event.target.value = originalValue;
-  
   const success = await capNhatTrangThaiHoaDon(hd.id, trangThaiMoi);
-  
   if (success && showDetailHD.value && selectedHD.value && selectedHD.value.id === hd.id) {
     selectedHD.value.trangThai = trangThaiMoi;
   }
@@ -39,22 +35,16 @@ const handleCancelOrder = async (hd) => {
   }
 }
 
-// ==========================================
-// THUẬT TOÁN TÍNH TOÁN THỐNG KÊ DOANH THU 
-// ==========================================
 const currDate = new Date();
 const cDay = currDate.getDate();
 const cMonth = currDate.getMonth() + 1;
 const cYear = currDate.getFullYear();
-
 const checkDate = (dateStr, type) => {
   const match = String(dateStr).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!match) return false;
-  
   const d = parseInt(match[1]);
   const m = parseInt(match[2]);
   const y = parseInt(match[3]);
-  
   if (type === 'day') return d === cDay && m === cMonth && y === cYear;
   if (type === 'month') return m === cMonth && y === cYear;
   if (type === 'year') return y === cYear;
@@ -66,60 +56,43 @@ const doanhThuHomNay = computed(() => {
     .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'day'))
     .reduce((sum, hd) => sum + Number(hd.tong), 0);
 });
-
 const doanhThuThangNay = computed(() => {
   return dsHoaDon.value
     .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'month'))
     .reduce((sum, hd) => sum + Number(hd.tong), 0);
 });
-
 const doanhThuNamNay = computed(() => {
   return dsHoaDon.value
     .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'year'))
     .reduce((sum, hd) => sum + Number(hd.tong), 0);
 });
-
 const tongDoanhThu = computed(() => {
   return dsHoaDon.value
     .filter(hd => hd.trangThai === 'Hoàn thành')
     .reduce((sum, hd) => sum + Number(hd.tong), 0);
 });
 
-// ==========================================
-// THUẬT TOÁN THỐNG KÊ SẢN PHẨM BÁN CHẠY
-// ==========================================
 const thongKeSanPham = computed(() => {
   const thongKe = {};
-  
   dsHoaDon.value.forEach(hd => {
     if (hd.trangThai === 'Hoàn thành' && Array.isArray(hd.danhSachMon)) {
       hd.danhSachMon.forEach(mon => {
         if (!thongKe[mon.id]) {
           const spGoc = adminSanPhams.value.find(s => String(s.id) === String(mon.id));
           const tenGoc = spGoc ? spGoc.name : mon.name.split(' (')[0];
-          
-          thongKe[mon.id] = {
-            id: mon.id,
-            name: tenGoc,
-            img: mon.img,
-            daBan: 0,
-            doanhThu: 0
-          };
+          thongKe[mon.id] = { id: mon.id, name: tenGoc, img: mon.img, daBan: 0, doanhThu: 0 };
         }
-        
         thongKe[mon.id].daBan += mon.quantity;
         thongKe[mon.id].doanhThu += (mon.price * mon.quantity);
       });
     }
   });
-  
   return Object.values(thongKe).sort((a, b) => b.daBan - a.daBan);
 });
 </script>
 
 <template>
   <div>
-    
     <div v-if="adminTab === 'thong-ke'">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="m-0 text-primary fw-bold">📊 Thống kê & Báo cáo</h4>
@@ -173,23 +146,18 @@ const thongKeSanPham = computed(() => {
                   <td><img :src="sp.img" width="40" height="40" class="rounded border" style="object-fit: cover;"></td>
                   <td class="fw-bold text-dark">{{ sp.name }}</td>
                   <td class="text-center">
-                    <span :class="['badge fs-6', index === 0 ? 'bg-danger' : index === 1 ? 'bg-warning text-dark' : index === 2 ? 'bg-info' : 'bg-success']">
-                      {{ sp.daBan }}
-                    </span>
+                    <span :class="['badge fs-6', index === 0 ? 'bg-danger' : index === 1 ? 'bg-warning text-dark' : index === 2 ? 'bg-info' : 'bg-success']">{{ sp.daBan }}</span>
                   </td>
                   <td class="text-end pe-4 text-primary fw-bold">{{ sp.doanhThu.toLocaleString() }}đ</td>
                 </tr>
                 <tr v-if="thongKeSanPham.length === 0">
-                  <td colspan="5" class="text-center py-5 text-muted">
-                    Chưa có sản phẩm nào được bán thành công.
-                  </td>
+                  <td colspan="5" class="text-center py-5 text-muted">Chưa có sản phẩm nào được bán thành công.</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
       <div class="card shadow-sm bg-white border-0 p-4 border-start border-4 border-warning">
         <h5 class="fw-bold text-dark mb-2">💡 Lưu ý hệ thống</h5>
         <p class="text-muted m-0">
@@ -267,26 +235,12 @@ const thongKeSanPham = computed(() => {
     <div v-if="adminTab === 'khach-hang'">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="m-0 text-primary fw-bold">{{ showDetailKH ? 'Chi tiết Khách Hàng' : 'Danh sách Tài khoản' }}</h4>
-        
         <div v-if="!showDetailKH" class="input-group shadow-sm" style="max-width: 300px;">
           <span class="input-group-text bg-white border-primary text-primary">🔍</span>
-          <input 
-            v-model="searchKhachHang" 
-            type="text" 
-            class="form-control border-primary" 
-            placeholder="Tìm theo Tên, SĐT, Email..."
-          >
-          <button 
-            v-if="searchKhachHang" 
-            @click="searchKhachHang = ''" 
-            class="btn btn-outline-danger border-primary border-start-0"
-            title="Xóa tìm kiếm"
-          >
-            ✖
-          </button>
+          <input v-model="searchKhachHang" type="text" class="form-control border-primary" placeholder="Tìm theo Tên, SĐT, Email...">
+          <button v-if="searchKhachHang" @click="searchKhachHang = ''" class="btn btn-outline-danger border-primary border-start-0" title="Xóa tìm kiếm">✖</button>
         </div>
       </div>
-      
       <div v-if="showDetailKH" class="card p-4 shadow-sm bg-white border-0">
         <div class="row g-3">
           <div class="col-md-6"><label class="fw-bold mb-2">ID Tài khoản</label><input :value="selectedKH.id" class="form-control bg-light" readonly></div>
@@ -307,7 +261,6 @@ const thongKeSanPham = computed(() => {
           <button v-else @click="toggleBlacklist(selectedKH)" class="btn btn-success fw-bold">Mở khóa tài khoản</button>
         </div>
       </div>
-      
       <table v-else class="table table-hover shadow-sm align-middle bg-white rounded">
         <thead class="table-primary"><tr><th>ID</th><th>Tài khoản</th><th>Email</th><th>SĐT</th><th class="text-center">Trạng thái</th><th class="text-center">Hành động</th></tr></thead>
         <tbody>
@@ -331,17 +284,57 @@ const thongKeSanPham = computed(() => {
       </table>
     </div>
 
+    <div v-if="adminTab === 'ma-giam-gia'">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="m-0 text-primary fw-bold">{{ showFormMGG ? (isEditMGG ? 'Sửa Mã' : 'Thêm Mã Mới') : 'Quản lý Mã Giảm Giá' }}</h4>
+        <button v-if="!showFormMGG" @click="showFormMGG = true" class="btn btn-primary fw-bold">+ Tạo Mã Giảm Giá</button>
+      </div>
+      <div v-if="showFormMGG" class="card p-4 shadow-sm bg-white border-0">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="fw-bold mb-2">Mã Code (Tên mã)</label><input v-model="formMGG.code" class="form-control text-uppercase" placeholder="Ví dụ: FREESHIP"></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Số tiền giảm (VNĐ)</label><input v-model="formMGG.giamGia" type="number" class="form-control" min="0"></div>
+          <div class="col-md-4">
+            <label class="fw-bold mb-2">Trạng thái</label>
+            <select v-model="formMGG.isActive" class="form-select">
+              <option :value="true">Đang kích hoạt</option>
+              <option :value="false">Vô hiệu hóa</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-4">
+          <button @click="luuMaGiamGia" class="btn btn-primary fw-bold me-2">Lưu Mã</button>
+          <button @click="huyFormMGG" class="btn btn-secondary fw-bold">Quay lại</button>
+        </div>
+      </div>
+      <table v-else class="table table-hover shadow-sm bg-white rounded text-center align-middle">
+        <thead class="table-primary"><tr><th>ID</th><th>Mã Code</th><th>Số tiền giảm</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+        <tbody>
+          <tr v-for="m in dsMaGiamGia" :key="m.id">
+            <td>{{ m.id }}</td>
+            <td class="fw-bold text-danger">{{ m.code }}</td>
+            <td class="fw-bold">{{ Number(m.giamGia).toLocaleString() }}đ</td>
+            <td><span :class="m.isActive ? 'badge bg-success' : 'badge bg-secondary'">{{ m.isActive ? 'Kích hoạt' : 'Đã tắt' }}</span></td>
+            <td>
+              <button @click="suaMaGiamGia(m)" class="btn btn-sm btn-warning me-2 fw-bold">Sửa</button>
+              <button @click="xoaMaGiamGia(m.id)" class="btn btn-sm btn-danger fw-bold">Xóa</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <div v-if="adminTab === 'hoa-don'">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="m-0 text-primary fw-bold">{{ showDetailHD ? 'Chi tiết Đơn Hàng' : 'Theo dõi Đơn Hàng' }}</h4>
-        <button v-if="!showDetailHD" @click="layDuLieuHoaDon" class="btn btn-outline-primary fw-bold">🔄 Làm mới danh sách</button>
+        <div>
+          <button v-if="!showDetailHD" @click="layDuLieuHoaDon" class="btn btn-outline-primary fw-bold">🔄 Làm mới</button>
+        </div>
       </div>
 
       <div v-if="showDetailHD" class="card p-4 shadow-sm bg-white border-0">
         <div class="row g-3">
           <div class="col-md-4"><label class="fw-bold mb-2">Mã đơn hàng</label><input :value="'#' + selectedHD.id" class="form-control bg-light text-primary fw-bold" readonly></div>
           <div class="col-md-4"><label class="fw-bold mb-2">Ngày đặt</label><input :value="selectedHD.ngay" class="form-control bg-light" readonly></div>
-          
           <div class="col-md-4">
             <label class="fw-bold mb-2">Trạng thái</label>
             <select :value="selectedHD.trangThai" @change="handleStatusChange(selectedHD, $event)" 
@@ -356,10 +349,11 @@ const thongKeSanPham = computed(() => {
             </select>
           </div>
           
-          <h5 class="mt-4 border-bottom pb-2 fw-bold text-primary">Thông tin Khách hàng</h5>
-          <div class="col-md-4"><label class="fw-bold mb-2">Tên khách</label><input :value="selectedHD.khach" class="form-control bg-light" readonly></div>
-          <div class="col-md-4"><label class="fw-bold mb-2">Số điện thoại</label><input :value="selectedHD.sdt || 'Không có'" class="form-control bg-light" readonly></div>
-          <div class="col-md-4"><label class="fw-bold mb-2">Email</label><input :value="selectedHD.email || 'Không có'" class="form-control bg-light" readonly></div>
+          <h5 class="mt-4 border-bottom pb-2 fw-bold text-primary">Thông tin Khách hàng & Thanh toán</h5>
+          <div class="col-md-3"><label class="fw-bold mb-2">Tên khách</label><input :value="selectedHD.khach" class="form-control bg-light" readonly></div>
+          <div class="col-md-3"><label class="fw-bold mb-2">Số điện thoại</label><input :value="selectedHD.sdt || 'Không có'" class="form-control bg-light" readonly></div>
+          <div class="col-md-3"><label class="fw-bold mb-2">Hình thức TT</label><input :value="selectedHD.phuongThucThanhToan || 'COD'" class="form-control bg-light fw-bold text-success" readonly></div>
+          <div class="col-md-3"><label class="fw-bold mb-2">Mã Giảm Giá</label><input :value="selectedHD.maGiamGia || 'Không có'" class="form-control bg-light" readonly></div>
 
           <h5 class="mt-4 border-bottom pb-2 fw-bold text-primary">Chi tiết Sản phẩm</h5>
           <div class="col-12">
@@ -376,8 +370,10 @@ const thongKeSanPham = computed(() => {
               </li>
             </ul>
           </div>
-          <div class="col-12 text-end mt-3">
-            <h4 class="fw-bold">Tổng tiền: <span class="text-danger">{{ Number(selectedHD.tong).toLocaleString() }} VNĐ</span></h4>
+          <div class="col-12 text-end mt-3 border-top pt-3">
+            <p class="mb-1">Tiền Ship: +{{ selectedHD.tienShip ? Number(selectedHD.tienShip).toLocaleString() : '30,000' }}đ</p>
+            <p class="mb-1 text-success">Giảm giá: -{{ selectedHD.tienGiam ? Number(selectedHD.tienGiam).toLocaleString() : '0' }}đ</p>
+            <h4 class="fw-bold mt-2">Tổng thanh toán: <span class="text-danger">{{ Number(selectedHD.tong).toLocaleString() }} VNĐ</span></h4>
           </div>
         </div>
 
@@ -387,12 +383,12 @@ const thongKeSanPham = computed(() => {
         </div>
       </div>
       
-      <table v-else class="table table-hover shadow-sm bg-white rounded align-middle">
+      <table v-else class="table table-hover shadow-sm bg-white rounded align-middle text-center">
         <thead class="table-primary">
           <tr>
             <th>Mã ĐH</th>
-            <th>Ngày đặt</th>
             <th>Khách hàng</th>
+            <th>Thanh toán</th>
             <th>Tổng tiền</th>
             <th style="width: 15%">Trạng thái</th>
             <th class="text-center">Thao tác</th>
@@ -401,8 +397,8 @@ const thongKeSanPham = computed(() => {
         <tbody>
           <tr v-for="hd in dsHoaDon" :key="hd.id">
             <td class="fw-bold">#{{ hd.id }}</td>
-            <td class="text-muted small">{{ hd.ngay }}</td>
             <td class="fw-bold text-primary">{{ hd.khach }}</td>
+            <td><span class="badge bg-secondary">{{ hd.phuongThucThanhToan || 'COD' }}</span></td>
             <td class="text-danger fw-bold">{{ Number(hd.tong).toLocaleString() }}đ</td>
             
             <td>
@@ -427,7 +423,6 @@ const thongKeSanPham = computed(() => {
             <td class="text-center">
               <div class="d-flex gap-2 justify-content-center">
                 <button @click="xemHoaDon(hd)" class="btn btn-sm btn-info text-white fw-bold px-3">Chi tiết</button>
-                <button v-if="hd.trangThai !== 'Đã hủy' && hd.trangThai !== 'Hoàn thành'" @click="handleCancelOrder(hd)" class="btn btn-sm btn-outline-danger px-3">Hủy đơn</button>
               </div>
             </td>
           </tr>

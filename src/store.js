@@ -7,6 +7,8 @@ const API_SANPHAM = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/sanpham'
 const API_USERS = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/users'
 const API_DANHMUC = 'https://698042e46570ee87d50e8e0c.mockapi.io/danhmuc'
 const API_HOADON = 'https://698042e46570ee87d50e8e0c.mockapi.io/hoadon'
+// Đã cập nhật link MockAPI Mã giảm giá mới của bạn:
+const API_MAGIAMGIA = 'https://69d34ed0336103955f8ec9e6.mockapi.io/magiamgia'
 
 const matchId = (id1, id2) => String(id1) === String(id2)
 
@@ -47,10 +49,8 @@ layDuLieuDanhMuc()
 
 export const luuDanhMuc = async () => {
   if (!formDM.value.name) return alert('Vui lòng nhập tên danh mục!')
-
   const isEdit = isEditDM.value
   const data = { name: formDM.value.name }
-
   if (!isEdit && formDM.value.id) data.id = formDM.value.id
 
   try {
@@ -177,21 +177,95 @@ export const suaSanPham = (item) => {
 }
 
 // ==========================================
-// 3. QUẢN LÝ GIỎ HÀNG & SINH ĐƠN HÀNG THỰC TẾ
+// 3. QUẢN LÝ MÃ GIẢM GIÁ
+// ==========================================
+export const dsMaGiamGia = ref([])
+export const showFormMGG = ref(false)
+export const isEditMGG = ref(false)
+export const formMGG = ref({ id: '', code: '', giamGia: 0, isActive: true })
+
+export const layDuLieuMaGiamGia = async () => {
+  try {
+    const res = await fetch(API_MAGIAMGIA)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) dsMaGiamGia.value = data
+    }
+  } catch (e) {
+    console.log('Lỗi tải mã giảm giá:', e)
+  }
+}
+layDuLieuMaGiamGia()
+
+export const luuMaGiamGia = async () => {
+  if (!formMGG.value.code || formMGG.value.giamGia <= 0) return alert('Dữ liệu không hợp lệ!')
+  const isEdit = isEditMGG.value
+  const data = { ...formMGG.value, giamGia: Number(formMGG.value.giamGia) }
+  try {
+    const res = await fetch(isEdit ? `${API_MAGIAMGIA}/${formMGG.value.id}` : API_MAGIAMGIA, {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (res.ok) {
+      await layDuLieuMaGiamGia()
+      showFormMGG.value = false
+    }
+  } catch (e) {}
+}
+
+export const xoaMaGiamGia = async (id) => {
+  if (!confirm('Xóa mã này?')) return
+  try {
+    await fetch(`${API_MAGIAMGIA}/${id}`, { method: 'DELETE' })
+    await layDuLieuMaGiamGia()
+  } catch (e) {}
+}
+
+export const suaMaGiamGia = (item) => {
+  showFormMGG.value = true
+  isEditMGG.value = true
+  formMGG.value = { ...item }
+}
+
+export const huyFormMGG = () => {
+  showFormMGG.value = false
+  isEditMGG.value = false
+  formMGG.value = { id: '', code: '', giamGia: 0, isActive: true }
+}
+
+// ==========================================
+// 4. QUẢN LÝ GIỎ HÀNG & LOGIC THANH TOÁN
 // ==========================================
 export const cart = ref([])
+export const phuongThucThanhToan = ref('COD')
+export const maGiamGiaNhap = ref('')
+export const maGiamGiaApDung = ref(null)
+export const phiShip = ref(30000)
+
+export const apDungMaGiamGia = () => {
+  const mgg = dsMaGiamGia.value.find(
+    (m) => m.code.toUpperCase() === maGiamGiaNhap.value.toUpperCase() && m.isActive,
+  )
+  if (mgg) {
+    maGiamGiaApDung.value = mgg
+    alert('Áp dụng mã giảm giá thành công!')
+  } else {
+    maGiamGiaApDung.value = null
+    alert('Mã giảm giá không hợp lệ hoặc đã hết hạn!')
+  }
+}
 
 export const addToCart = (product, qty = 1) => {
   if (product.tonKho <= 0) return alert('Hết hàng!')
   const item = cart.value.find((i) => matchId(i.id, product.id) && i.name === product.name)
-  
   const totalThisProductInCart = cart.value
     .filter((i) => matchId(i.id, product.id))
     .reduce((sum, i) => sum + i.quantity, 0)
-    
+
   if (totalThisProductInCart + qty > product.tonKho)
     return alert(`Kho chỉ còn ${product.tonKho} sản phẩm!`)
-    
+
   if (item) {
     item.quantity += qty
   } else {
@@ -226,7 +300,7 @@ export const removeCartItem = (index) => {
 
 export const handleCheckout = async () => {
   if (cart.value.length === 0) return
-  
+
   if (!currentUserProfile.value.id) {
     alert('Vui lòng đăng nhập để tiến hành đặt món và theo dõi đơn hàng!')
     currentView.value = 'login'
@@ -236,13 +310,17 @@ export const handleCheckout = async () => {
   try {
     for (const item of cart.value) {
       const sp = adminSanPhams.value.find((s) => s.id === item.id)
-      if (sp)
+      if (sp) {
         await fetch(`${API_SANPHAM}/${item.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tonKho: sp.tonKho - item.quantity }),
         })
+      }
     }
+
+    const tienGiam = maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0
+    const tongThanhToan = totalAmount.value + phiShip.value - tienGiam
 
     const newOrder = {
       ngay: new Date().toLocaleString('vi-VN'),
@@ -250,10 +328,14 @@ export const handleCheckout = async () => {
       khach: currentUserProfile.value.user || 'Khách vãng lai',
       sdt: currentUserProfile.value.phone || 'Không có',
       email: currentUserProfile.value.email || 'Không có',
-      tong: totalAmount.value,
+      tong: tongThanhToan > 0 ? tongThanhToan : 0,
       trangThai: 'Chờ xác nhận',
       chiTiet: cart.value.map((i) => `${i.name} (SL: ${i.quantity})`).join(', '),
-      danhSachMon: cart.value, 
+      danhSachMon: cart.value,
+      phuongThucThanhToan: phuongThucThanhToan.value,
+      maGiamGia: maGiamGiaApDung.value ? maGiamGiaApDung.value.code : 'Không có',
+      tienGiam: tienGiam,
+      tienShip: phiShip.value,
     }
 
     await fetch(API_HOADON, {
@@ -264,8 +346,12 @@ export const handleCheckout = async () => {
 
     await layDuLieuSanPham()
     await layDuLieuHoaDon()
-    alert('Đặt hàng thành công! Vui lòng vào Lịch sử đơn hàng để theo dõi tiến độ.')
+    alert('Đặt hàng thành công! Đơn hàng đang chờ xác nhận.')
     cart.value = []
+    maGiamGiaNhap.value = ''
+    maGiamGiaApDung.value = null
+    phuongThucThanhToan.value = 'COD'
+    currentView.value = 'client'
   } catch (e) {
     alert('Lỗi xử lý đơn hàng!')
   }
@@ -281,7 +367,7 @@ export const totalItemsInCart = computed(() => {
 })
 
 // ==========================================
-// 4. LOGIC TÀI KHOẢN
+// 5. LOGIC TÀI KHOẢN
 // ==========================================
 export const regUsername = ref('')
 export const regEmail = ref('')
@@ -367,7 +453,7 @@ export const handleLogin = () => {
 
 export const handleLogout = () => {
   if (confirm('Đăng xuất?')) {
-    currentView.value = 'client' 
+    currentView.value = 'client'
     username.value = ''
     password.value = ''
     currentUserProfile.value = { id: null, user: '', phone: '', email: '', pass: '' }
@@ -375,11 +461,11 @@ export const handleLogout = () => {
 }
 
 // ==========================================
-// 5. ADMIN KHÁCH HÀNG (BLACKLIST & TÌM KIẾM)
+// 6. ADMIN KHÁCH HÀNG (BLACKLIST & TÌM KIẾM)
 // ==========================================
 export const showDetailKH = ref(false)
 export const selectedKH = ref({ id: null, user: '', email: '', phone: '', isBlacklisted: false })
-export const searchKhachHang = ref('') // Biến lưu từ khóa tìm kiếm khách
+export const searchKhachHang = ref('')
 
 export const dongChiTietKH = () => {
   showDetailKH.value = false
@@ -411,23 +497,26 @@ export const toggleBlacklist = async (user) => {
   }
 }
 
-// Lọc khách hàng theo từ khóa (Tìm theo Tên, Email hoặc Số điện thoại)
 export const filteredKhachHang = computed(() => {
-  if (!searchKhachHang.value.trim()) return registeredUsers.value;
-  const keyword = searchKhachHang.value.toLowerCase().trim();
-  return registeredUsers.value.filter(kh => 
-    String(kh.user).toLowerCase().includes(keyword) || 
-    String(kh.email).toLowerCase().includes(keyword) || 
-    String(kh.phone || '').toLowerCase().includes(keyword)
-  );
+  if (!searchKhachHang.value.trim()) return registeredUsers.value
+  const keyword = searchKhachHang.value.toLowerCase().trim()
+  return registeredUsers.value.filter(
+    (kh) =>
+      String(kh.user).toLowerCase().includes(keyword) ||
+      String(kh.email).toLowerCase().includes(keyword) ||
+      String(kh.phone || '')
+        .toLowerCase()
+        .includes(keyword),
+  )
 })
 
 // ==========================================
-// 6. QUẢN LÝ ĐƠN HÀNG
+// 7. QUẢN LÝ ĐƠN HÀNG & DUYỆT ĐƠN
 // ==========================================
 export const dsHoaDon = ref([])
 export const showDetailHD = ref(false)
 export const selectedHD = ref(null)
+export const selectedOrderIds = ref([])
 
 export const xemHoaDon = (hd) => {
   selectedHD.value = hd
@@ -468,8 +557,10 @@ export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
   return false
 }
 
+// Bỏ hàm xacNhanDonHangHangLoat vì bạn đã yêu cầu xóa nút này.
+
 // ==========================================
-// 7. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
+// 8. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
 // ==========================================
 export const handleUpdateProfile = async () => {
   if (!currentUserProfile.value.user || !currentUserProfile.value.phone)
