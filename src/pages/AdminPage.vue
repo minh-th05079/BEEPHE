@@ -1,10 +1,9 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { 
-  adminTab,
-  dsDanhMuc, showFormDM, isEditDM, formDM, luuDanhMuc, xoaDanhMuc, suaDanhMuc, huyFormDM,
+  adminTab, dsDanhMuc, showFormDM, isEditDM, formDM, luuDanhMuc, xoaDanhMuc, suaDanhMuc, huyFormDM,
   adminSanPhams, showFormSP, isEditSP, formSP, luuSanPham, xoaSanPham, suaSanPham, huyFormSP,
-  registeredUsers, showDetailKH, selectedKH, xemKhachHang, dongChiTietKH, toggleBlacklist, searchKhachHang, filteredKhachHang,
+  registeredUsers, showDetailKH, selectedKH, xemKhachHang, dongChiTietKH, toggleBlacklist, searchKhachHang, filteredKhachHang, capNhatLoaiKhach,
   dsHoaDon, layDuLieuHoaDon, showDetailHD, selectedHD, xemHoaDon, dongChiTietHD, capNhatTrangThaiHoaDon,
   dsMaGiamGia, showFormMGG, isEditMGG, formMGG, luuMaGiamGia, xoaMaGiamGia, suaMaGiamGia, huyFormMGG
 } from '../store.js'
@@ -35,60 +34,163 @@ const handleCancelOrder = async (hd) => {
   }
 }
 
-const currDate = new Date();
-const cDay = currDate.getDate();
-const cMonth = currDate.getMonth() + 1;
-const cYear = currDate.getFullYear();
-const checkDate = (dateStr, type) => {
-  const match = String(dateStr).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (!match) return false;
-  const d = parseInt(match[1]);
-  const m = parseInt(match[2]);
-  const y = parseInt(match[3]);
-  if (type === 'day') return d === cDay && m === cMonth && y === cYear;
-  if (type === 'month') return m === cMonth && y === cYear;
-  if (type === 'year') return y === cYear;
-  return false;
+// ==========================================
+// THỐNG KÊ (Biểu đồ, Lọc Ngày/Tháng/Năm, Lọc Đồ Uống)
+// ==========================================
+const loaiThoiGian = ref('all') // 'all', 'ngay', 'thang', 'nam'
+const thongKeDate = ref('')
+const thongKeMonth = ref('')
+const thongKeYear = ref(new Date().getFullYear())
+const thongKeDrink = ref('')
+const hienThiBieuDo = ref(false)
+
+const chartIndex = ref(0)
+const listCharts = [
+  { id: 'sp', name: 'Biểu đồ Top Sản Phẩm Bán Chạy' },
+  { id: 'dm', name: 'Biểu đồ Danh Mục Bán Chạy' }
+]
+
+// Hàm tách chuỗi "DD/MM/YYYY HH:mm" thành các con số Toán học
+const parseDateFromMock = (dateStr) => {
+  if (!dateStr) return { d: 0, m: 0, y: 0 };
+  const parts = dateStr.split(' ');
+  const datePart = parts[0];
+  if (!datePart) return { d: 0, m: 0, y: 0 };
+  const [d, m, y] = datePart.split('/');
+  return { d: Number(d), m: Number(m), y: Number(y) };
 }
 
-const doanhThuHomNay = computed(() => {
-  return dsHoaDon.value
-    .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'day'))
-    .reduce((sum, hd) => sum + Number(hd.tong), 0);
-});
-const doanhThuThangNay = computed(() => {
-  return dsHoaDon.value
-    .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'month'))
-    .reduce((sum, hd) => sum + Number(hd.tong), 0);
-});
-const doanhThuNamNay = computed(() => {
-  return dsHoaDon.value
-    .filter(hd => hd.trangThai === 'Hoàn thành' && checkDate(hd.ngay, 'year'))
-    .reduce((sum, hd) => sum + Number(hd.tong), 0);
-});
-const tongDoanhThu = computed(() => {
-  return dsHoaDon.value
-    .filter(hd => hd.trangThai === 'Hoàn thành')
-    .reduce((sum, hd) => sum + Number(hd.tong), 0);
-});
+// Lọc Đơn Hàng Hoàn Thành chuẩn xác 100% bằng số liệu
+const donHangHoanThanhFilterDate = computed(() => {
+  let list = dsHoaDon.value.filter(hd => hd.trangThai === 'Hoàn thành')
 
+  if (loaiThoiGian.value === 'ngay' && thongKeDate.value) {
+    const [selY, selM, selD] = thongKeDate.value.split('-')
+    list = list.filter(hd => {
+      const { d, m, y } = parseDateFromMock(hd.ngay)
+      return d === Number(selD) && m === Number(selM) && y === Number(selY)
+    })
+  }
+  else if (loaiThoiGian.value === 'thang' && thongKeMonth.value) {
+    const [selY, selM] = thongKeMonth.value.split('-')
+    list = list.filter(hd => {
+      const { m, y } = parseDateFromMock(hd.ngay)
+      return m === Number(selM) && y === Number(selY)
+    })
+  }
+  else if (loaiThoiGian.value === 'nam' && thongKeYear.value) {
+    list = list.filter(hd => {
+      const { y } = parseDateFromMock(hd.ngay)
+      return y === Number(thongKeYear.value)
+    })
+  }
+
+  return list
+})
+
+// Tính Doanh Thu
+const doanhThuTongTien = computed(() => {
+  if (thongKeDrink.value) {
+    return donHangHoanThanhFilterDate.value.reduce((sum, hd) => {
+      let tienMon = 0
+      if (hd.danhSachMon) {
+        hd.danhSachMon.forEach(mon => {
+          if (String(mon.id) === String(thongKeDrink.value)) tienMon += (mon.price * mon.quantity)
+        })
+      }
+      return sum + tienMon
+    }, 0)
+  }
+  return donHangHoanThanhFilterDate.value.reduce((sum, hd) => sum + Number(hd.tong), 0)
+})
+
+// Lịch sử Đồ uống
+const dsGiaoDichDoUong = computed(() => {
+  if (!thongKeDrink.value) return []
+  const result = []
+  donHangHoanThanhFilterDate.value.forEach(hd => {
+    if (hd.danhSachMon) {
+      const monFound = hd.danhSachMon.find(m => String(m.id) === String(thongKeDrink.value))
+      if (monFound) {
+        result.push({
+          hdId: hd.id,
+          ngay: hd.ngay,
+          khach: hd.khach,
+          quantity: monFound.quantity,
+          total: monFound.price * monFound.quantity
+        })
+      }
+    }
+  })
+  return result
+})
+
+// Thống kê Sản Phẩm
 const thongKeSanPham = computed(() => {
-  const thongKe = {};
-  dsHoaDon.value.forEach(hd => {
-    if (hd.trangThai === 'Hoàn thành' && Array.isArray(hd.danhSachMon)) {
+  const thongKe = {}
+  donHangHoanThanhFilterDate.value.forEach(hd => {
+    if (hd.danhSachMon) {
       hd.danhSachMon.forEach(mon => {
         if (!thongKe[mon.id]) {
-          const spGoc = adminSanPhams.value.find(s => String(s.id) === String(mon.id));
-          const tenGoc = spGoc ? spGoc.name : mon.name.split(' (')[0];
-          thongKe[mon.id] = { id: mon.id, name: tenGoc, img: mon.img, daBan: 0, doanhThu: 0 };
+          const spGoc = adminSanPhams.value.find(s => String(s.id) === String(mon.id))
+          thongKe[mon.id] = { id: mon.id, name: spGoc ? spGoc.name : mon.name.split(' (')[0], img: mon.img, daBan: 0, doanhThu: 0 }
         }
-        thongKe[mon.id].daBan += mon.quantity;
-        thongKe[mon.id].doanhThu += (mon.price * mon.quantity);
-      });
+        thongKe[mon.id].daBan += mon.quantity
+        thongKe[mon.id].doanhThu += (mon.price * mon.quantity)
+      })
     }
-  });
-  return Object.values(thongKe).sort((a, b) => b.daBan - a.daBan);
-});
+  })
+  return Object.values(thongKe).sort((a, b) => b.daBan - a.daBan)
+})
+
+// Thống kê Danh mục
+const thongKeDanhMuc = computed(() => {
+  const thongKe = {}
+  donHangHoanThanhFilterDate.value.forEach(hd => {
+    if (hd.danhSachMon) {
+      hd.danhSachMon.forEach(mon => {
+        const spGoc = adminSanPhams.value.find(s => String(s.id) === String(mon.id))
+        const catId = spGoc ? spGoc.category : 'Khác'
+        if (!thongKe[catId]) {
+          const dmObj = dsDanhMuc.value.find(d => String(d.id) === String(catId))
+          thongKe[catId] = { name: dmObj ? dmObj.name : 'Khác', daBan: 0 }
+        }
+        thongKe[catId].daBan += mon.quantity
+      })
+    }
+  })
+  return Object.values(thongKe).sort((a, b) => b.daBan - a.daBan)
+})
+
+// LOGIC VẼ LƯỚI CHO BIỂU ĐỒ (Cách nhau 5 ly)
+const getChartMax = (maxValue) => {
+  if (!maxValue || maxValue < 5) return 5;
+  return Math.ceil(maxValue / 5) * 5; // Làm tròn lên mốc 5 (ví dụ 12 ly -> max cột là 15)
+}
+const getGridSteps = (maxValue) => {
+  const max = getChartMax(maxValue);
+  const steps = []
+  for (let i = 5; i <= max; i += 5) {
+    steps.push(i)
+  }
+  return steps
+}
+
+const nextChart = () => { chartIndex.value = (chartIndex.value + 1) % listCharts.length }
+const prevChart = () => { chartIndex.value = (chartIndex.value - 1 + listCharts.length) % listCharts.length }
+const goFirstChart = () => { chartIndex.value = 0 }
+const goLastChart = () => { chartIndex.value = listCharts.length - 1 }
+
+// --- KHÁCH HÀNG ---
+const khachHangFilter = ref('all')
+const sortTopChiTieu = ref(false)
+const danhSachKhachHangHienThi = computed(() => {
+  let list = filteredKhachHang.value
+  if (khachHangFilter.value === 'VIP') list = list.filter(kh => kh.loaiKhach === 'VIP')
+  if (khachHangFilter.value === 'Quen') list = list.filter(kh => kh.loaiKhach === 'Quen')
+  if (sortTopChiTieu.value) list = [...list].sort((a, b) => (b.tongChiTieu || 0) - (a.tongChiTieu || 0))
+  return list
+})
 </script>
 
 <template>
@@ -96,74 +198,157 @@ const thongKeSanPham = computed(() => {
     <div v-if="adminTab === 'thong-ke'">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="m-0 text-primary fw-bold">📊 Thống kê & Báo cáo</h4>
-        <button @click="layDuLieuHoaDon" class="btn btn-outline-primary fw-bold">🔄 Làm mới dữ liệu</button>
+        <button @click="hienThiBieuDo = !hienThiBieuDo" :class="['btn fw-bold px-4 shadow-sm', hienThiBieuDo ? 'btn-secondary' : 'btn-primary']">
+          {{ hienThiBieuDo ? '📄 Quay lại Bảng' : '📈 Xem Biểu Đồ' }}
+        </button>
       </div>
 
-      <div class="row g-4 mb-4">
-        <div class="col-md-3">
-          <div class="card bg-primary text-white border-0 shadow-sm h-100 p-4">
-            <h6 class="fw-bold mb-3 text-warning">Doanh thu Hôm nay</h6>
-            <h3 class="fw-bold m-0">{{ doanhThuHomNay.toLocaleString() }}đ</h3>
+      <div class="row mb-4 bg-white p-3 shadow-sm rounded border border-info mx-1">
+        <div class="col-md-7">
+          <label class="fw-bold text-info mb-2">Tra cứu Doanh thu theo:</label>
+          <div class="d-flex gap-2">
+            <select v-model="loaiThoiGian" class="form-select border-info fw-bold text-info shadow-sm" style="width: 190px;">
+              <option value="all">Tất cả thời gian</option>
+              <option value="ngay">Chỉ chọn Ngày</option>
+              <option value="thang">Chỉ chọn Tháng/Năm</option>
+              <option value="nam">Chỉ chọn Năm</option>
+            </select>
+            
+            <input v-if="loaiThoiGian === 'ngay'" type="date" v-model="thongKeDate" class="form-control border-info shadow-sm">
+            <input v-if="loaiThoiGian === 'thang'" type="month" v-model="thongKeMonth" class="form-control border-info shadow-sm">
+            <select v-if="loaiThoiGian === 'nam'" v-model="thongKeYear" class="form-select border-info shadow-sm">
+              <option v-for="y in [2024, 2025, 2026, 2027, 2028]" :key="y" :value="y">Năm {{ y }}</option>
+            </select>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card bg-info text-white border-0 shadow-sm h-100 p-4">
-            <h6 class="fw-bold mb-3 text-dark">Doanh thu Tháng này</h6>
-            <h3 class="fw-bold m-0">{{ doanhThuThangNay.toLocaleString() }}đ</h3>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card bg-success text-white border-0 shadow-sm h-100 p-4">
-            <h6 class="fw-bold mb-3 text-warning">Doanh thu Năm nay</h6>
-            <h3 class="fw-bold m-0">{{ doanhThuNamNay.toLocaleString() }}đ</h3>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card bg-dark text-white border-0 shadow-sm h-100 p-4">
-            <h6 class="fw-bold mb-3 text-warning">Tổng Doanh thu Tất cả</h6>
-            <h3 class="fw-bold m-0">{{ tongDoanhThu.toLocaleString() }}đ</h3>
-          </div>
-        </div>
-      </div>
-      
-      <div class="row mb-4">
-        <div class="col-12">
-          <h5 class="fw-bold text-primary mb-3">🏆 Bảng Xếp Hạng Sản Phẩm Bán Chạy</h5>
-          <div class="card shadow-sm border-0 bg-white">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th class="text-center ps-3" style="width: 5%">#</th>
-                  <th style="width: 10%">Ảnh</th>
-                  <th style="width: 35%">Tên sản phẩm</th>
-                  <th class="text-center" style="width: 20%">Đã bán (Ly)</th>
-                  <th class="text-end pe-4" style="width: 30%">Doanh thu mang lại</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(sp, index) in thongKeSanPham" :key="sp.id">
-                  <td class="text-center fw-bold ps-3">{{ index + 1 }}</td>
-                  <td><img :src="sp.img" width="40" height="40" class="rounded border" style="object-fit: cover;"></td>
-                  <td class="fw-bold text-dark">{{ sp.name }}</td>
-                  <td class="text-center">
-                    <span :class="['badge fs-6', index === 0 ? 'bg-danger' : index === 1 ? 'bg-warning text-dark' : index === 2 ? 'bg-info' : 'bg-success']">{{ sp.daBan }}</span>
-                  </td>
-                  <td class="text-end pe-4 text-primary fw-bold">{{ sp.doanhThu.toLocaleString() }}đ</td>
-                </tr>
-                <tr v-if="thongKeSanPham.length === 0">
-                  <td colspan="5" class="text-center py-5 text-muted">Chưa có sản phẩm nào được bán thành công.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="col-md-5 border-start">
+          <label class="fw-bold text-warning mb-2">Tra cứu Lịch sử Đồ Uống:</label>
+          <select v-model="thongKeDrink" class="form-select border-warning shadow-sm">
+            <option value="">-- Tất cả đồ uống --</option>
+            <option v-for="sp in adminSanPhams" :key="sp.id" :value="sp.id">{{ sp.name }}</option>
+          </select>
         </div>
       </div>
-      <div class="card shadow-sm bg-white border-0 p-4 border-start border-4 border-warning">
-        <h5 class="fw-bold text-dark mb-2">💡 Lưu ý hệ thống</h5>
-        <p class="text-muted m-0">
-          - Doanh thu và bảng xếp hạng sản phẩm chỉ được tính từ các đơn hàng có trạng thái là <b>"Hoàn thành"</b>.<br>
-          - Các đơn hàng "Chờ xác nhận", "Đang làm", "Đang giao" hoặc "Đã hủy" <b>không</b> được cộng vào hệ thống thống kê.
-        </p>
+
+      <div class="alert alert-success fw-bold text-center fs-5 shadow-sm border-2">
+        <span v-if="thongKeDrink">Tổng doanh thu của Đồ uống đã chọn:</span>
+        <span v-else-if="loaiThoiGian === 'ngay' && thongKeDate">Doanh thu chốt ngày {{ thongKeDate }}:</span>
+        <span v-else-if="loaiThoiGian === 'thang' && thongKeMonth">Doanh thu chốt tháng {{ thongKeMonth }}:</span>
+        <span v-else-if="loaiThoiGian === 'nam' && thongKeYear">Doanh thu chốt cả năm {{ thongKeYear }}:</span>
+        <span v-else>Tổng doanh thu Hoàn thành của Toàn hệ thống:</span>
+        <br>
+        <span class="text-danger fs-1">{{ doanhThuTongTien.toLocaleString() }} VNĐ</span>
+      </div>
+
+      <div v-if="hienThiBieuDo" class="card shadow-sm border-0 bg-white p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+          <h5 class="fw-bold text-primary m-0">📉 {{ listCharts[chartIndex].name }}</h5>
+          <select v-model="chartIndex" class="form-select form-select-sm fw-bold border-primary text-primary" style="width: 250px;">
+            <option v-for="(chart, index) in listCharts" :key="index" :value="index">{{ chart.name }}</option>
+          </select>
+        </div>
+
+        <div v-if="chartIndex === 0" class="chart-container custom-scrollbar pb-2" style="overflow-x: auto; padding-left: 45px; padding-right: 20px;">
+          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 30px; padding-top: 20px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
+            
+            <div v-for="step in getGridSteps(thongKeSanPham[0]?.daBan || 0)" :key="step" 
+                 class="position-absolute w-100" 
+                 :style="{ bottom: (step / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
+              <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+            </div>
+
+            <div v-for="sp in thongKeSanPham.slice(0, 15)" :key="sp.id" class="d-flex flex-column align-items-center" style="width: 80px; z-index: 1; margin-left: 10px;">
+              <span class="small fw-bold text-danger mb-1 bg-white px-2 rounded shadow-sm">{{ sp.daBan }}</span>
+              <div class="bg-warning w-100 rounded-top shadow-sm transition-bar" 
+                   :style="{ height: (sp.daBan / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px' }"
+                   title="Doanh thu: {{ sp.doanhThu.toLocaleString() }}đ"></div>
+              <span class="small text-truncate w-100 text-center mt-2 fw-bold" :title="sp.name">{{ sp.name }}</span>
+            </div>
+            
+            <div v-if="thongKeSanPham.length === 0" class="w-100 text-center text-muted position-absolute" style="bottom: 10px;">Không có dữ liệu trong thời gian này.</div>
+          </div>
+        </div>
+
+        <div v-if="chartIndex === 1" class="chart-container custom-scrollbar pb-2" style="overflow-x: auto; padding-left: 45px; padding-right: 20px;">
+          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 40px; padding-top: 20px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
+            
+            <div v-for="step in getGridSteps(thongKeDanhMuc[0]?.daBan || 0)" :key="step" 
+                 class="position-absolute w-100" 
+                 :style="{ bottom: (step / getChartMax(thongKeDanhMuc[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
+              <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+            </div>
+
+            <div v-for="dm in thongKeDanhMuc" :key="dm.name" class="d-flex flex-column align-items-center" style="width: 120px; z-index: 1; margin-left: 20px;">
+              <span class="small fw-bold text-primary mb-1 bg-white px-2 rounded shadow-sm">{{ dm.daBan }}</span>
+              <div class="bg-info w-100 rounded-top shadow-sm transition-bar" 
+                   :style="{ height: (dm.daBan / getChartMax(thongKeDanhMuc[0]?.daBan || 0) * 230) + 'px' }"></div>
+              <span class="small w-100 text-center mt-2 fw-bold text-wrap">{{ dm.name }}</span>
+            </div>
+
+            <div v-if="thongKeDanhMuc.length === 0" class="w-100 text-center text-muted position-absolute" style="bottom: 10px;">Không có dữ liệu trong thời gian này.</div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-center mt-5 gap-2">
+          <button @click="goFirstChart" class="btn btn-sm btn-outline-dark fw-bold">|◄ Đầu</button>
+          <button @click="prevChart" class="btn btn-sm btn-outline-dark fw-bold">◄ Trước</button>
+          <button @click="nextChart" class="btn btn-sm btn-outline-dark fw-bold">Tiếp ►</button>
+          <button @click="goLastChart" class="btn btn-sm btn-outline-dark fw-bold">Cuối ►|</button>
+        </div>
+      </div>
+
+      <div v-if="!hienThiBieuDo" class="card shadow-sm border-0 bg-white">
+        
+        <table v-if="!thongKeDrink" class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="text-center ps-3" style="width: 5%">#</th>
+              <th style="width: 10%">Ảnh</th>
+              <th style="width: 35%">Tên sản phẩm</th>
+              <th class="text-center" style="width: 20%">Đã bán (Ly)</th>
+              <th class="text-end pe-4" style="width: 30%">Doanh thu mang lại</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(sp, index) in thongKeSanPham" :key="sp.id">
+              <td class="text-center fw-bold ps-3">{{ index + 1 }}</td>
+              <td><img :src="sp.img" width="40" height="40" class="rounded border" style="object-fit: cover;"></td>
+              <td class="fw-bold text-dark">{{ sp.name }}</td>
+              <td class="text-center"><span class="badge bg-success fs-6">{{ sp.daBan }}</span></td>
+              <td class="text-end pe-4 text-primary fw-bold">{{ sp.doanhThu.toLocaleString() }}đ</td>
+            </tr>
+            <tr v-if="thongKeSanPham.length === 0">
+              <td colspan="5" class="text-center py-5 text-muted">Không có sản phẩm nào được bán trong khoảng thời gian này.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div v-else>
+          <h5 class="fw-bold text-warning p-3 m-0 border-bottom">📝 Lịch sử Giao dịch chi tiết của Đồ uống</h5>
+          <table class="table table-hover align-middle mb-0 text-center">
+            <thead class="table-warning text-dark">
+              <tr>
+                <th>Mã Đơn Hàng</th>
+                <th>Thời gian bán</th>
+                <th>Khách Hàng</th>
+                <th>Số lượng mua</th>
+                <th>Tổng tiền trả</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="gd in dsGiaoDichDoUong" :key="gd.hdId">
+                <td class="fw-bold text-primary">#{{ gd.hdId }}</td>
+                <td class="text-muted">{{ gd.ngay }}</td>
+                <td class="fw-bold">{{ gd.khach }}</td>
+                <td><span class="badge bg-dark fs-6">{{ gd.quantity }}</span></td>
+                <td class="text-danger fw-bold">{{ gd.total.toLocaleString() }}đ</td>
+              </tr>
+              <tr v-if="dsGiaoDichDoUong.length === 0">
+                <td colspan="5" class="text-center py-5 text-muted">Chưa có ai mua đồ uống này (trong thời gian đã chọn).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -234,13 +419,21 @@ const thongKeSanPham = computed(() => {
 
     <div v-if="adminTab === 'khach-hang'">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="m-0 text-primary fw-bold">{{ showDetailKH ? 'Chi tiết Khách Hàng' : 'Danh sách Tài khoản' }}</h4>
-        <div v-if="!showDetailKH" class="input-group shadow-sm" style="max-width: 300px;">
-          <span class="input-group-text bg-white border-primary text-primary">🔍</span>
-          <input v-model="searchKhachHang" type="text" class="form-control border-primary" placeholder="Tìm theo Tên, SĐT, Email...">
-          <button v-if="searchKhachHang" @click="searchKhachHang = ''" class="btn btn-outline-danger border-primary border-start-0" title="Xóa tìm kiếm">✖</button>
+        <h4 class="m-0 text-primary fw-bold">{{ showDetailKH ? 'Chi tiết Khách Hàng' : 'Danh sách Khách Hàng' }}</h4>
+        <div v-if="!showDetailKH" class="d-flex gap-2 align-items-center">
+          <button @click="khachHangFilter = 'all'; sortTopChiTieu = false" :class="['btn btn-sm fw-bold', khachHangFilter === 'all' && !sortTopChiTieu ? 'btn-dark' : 'btn-outline-dark']">Tất cả</button>
+          <button @click="khachHangFilter = 'VIP'; sortTopChiTieu = false" class="btn btn-sm btn-outline-warning fw-bold text-dark" style="background: gold;">Chỉ VIP</button>
+          <button @click="khachHangFilter = 'Quen'; sortTopChiTieu = false" class="btn btn-sm btn-secondary fw-bold text-white">Chỉ Khách Quen</button>
+          <button @click="sortTopChiTieu = true" :class="['btn btn-sm fw-bold text-white', sortTopChiTieu ? 'btn-danger' : 'btn-outline-danger text-danger']">🏆 Top Chi Tiêu</button>
+          
+          <div class="input-group shadow-sm ms-3" style="max-width: 250px;">
+            <span class="input-group-text bg-white border-primary text-primary">🔍</span>
+            <input v-model="searchKhachHang" type="text" class="form-control border-primary" placeholder="Tìm theo Tên, SĐT...">
+            <button v-if="searchKhachHang" @click="searchKhachHang = ''" class="btn btn-outline-danger border-primary border-start-0" title="Xóa tìm kiếm">✖</button>
+          </div>
         </div>
       </div>
+
       <div v-if="showDetailKH" class="card p-4 shadow-sm bg-white border-0">
         <div class="row g-3">
           <div class="col-md-6"><label class="fw-bold mb-2">ID Tài khoản</label><input :value="selectedKH.id" class="form-control bg-light" readonly></div>
@@ -261,24 +454,50 @@ const thongKeSanPham = computed(() => {
           <button v-else @click="toggleBlacklist(selectedKH)" class="btn btn-success fw-bold">Mở khóa tài khoản</button>
         </div>
       </div>
-      <table v-else class="table table-hover shadow-sm align-middle bg-white rounded">
-        <thead class="table-primary"><tr><th>ID</th><th>Tài khoản</th><th>Email</th><th>SĐT</th><th class="text-center">Trạng thái</th><th class="text-center">Hành động</th></tr></thead>
+
+      <table v-else class="table shadow-sm align-middle bg-white text-center custom-admin-table" style="border-collapse: separate; border-spacing: 0 10px;">
+        <thead class="table-primary">
+          <tr>
+            <th>Tài khoản</th>
+            <th>SĐT</th>
+            <th>Loại Khách</th>
+            <th>Tổng Chi Tiêu</th>
+            <th>Trạng thái</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-for="kh in filteredKhachHang" :key="kh.id">
-            <td>{{ kh.id }}</td><td class="fw-bold">{{ kh.user }}</td><td>{{ kh.email }}</td><td>{{ kh.phone || 'Chưa cập nhật' }}</td>
-            <td class="text-center"><span v-if="kh.isBlacklisted" class="badge bg-danger">Đã khóa</span><span v-else class="badge bg-success">Hoạt động</span></td>
-            <td class="text-center">
+          <tr v-for="kh in danhSachKhachHangHienThi" :key="kh.id" 
+              :class="{
+                'row-vip': kh.loaiKhach === 'VIP', 
+                'row-quen': kh.loaiKhach === 'Quen', 
+                'row-thuong': kh.loaiKhach === 'Thường' || !kh.loaiKhach
+              }">
+            <td class="fw-bold text-start ps-3">{{ kh.user }}</td>
+            <td>{{ kh.phone || 'Chưa cập nhật' }}</td>
+            <td>
+              <select :value="kh.loaiKhach || 'Thường'" @change="capNhatLoaiKhach(kh.id, $event.target.value)" 
+                :class="['form-select form-select-sm fw-bold text-center border-0 shadow-sm', 
+                  kh.loaiKhach === 'VIP' ? 'bg-warning text-dark' : 
+                  kh.loaiKhach === 'Quen' ? 'bg-secondary text-white' : 'bg-light']"
+                style="width: 130px; margin: 0 auto;"
+              >
+                <option value="Thường">Thường</option>
+                <option value="Quen">Khách Quen</option>
+                <option value="VIP">Khách VIP</option>
+              </select>
+            </td>
+            <td class="text-danger fw-bold">{{ (kh.tongChiTieu || 0).toLocaleString() }}đ</td>
+            <td><span v-if="kh.isBlacklisted" class="badge bg-danger">Đã khóa</span><span v-else class="badge bg-success">Hoạt động</span></td>
+            <td>
               <button @click="xemKhachHang(kh)" class="btn btn-sm btn-info text-white fw-bold me-2">Chi tiết</button>
-              <button v-if="!kh.isBlacklisted" @click="toggleBlacklist(kh)" class="btn btn-sm btn-outline-danger fw-bold" title="Khóa tài khoản">Khóa</button>
-              <button v-else @click="toggleBlacklist(kh)" class="btn btn-sm btn-success fw-bold" title="Mở khóa tài khoản">Mở khóa</button>
+              <button @click="toggleBlacklist(kh)" :class="['btn btn-sm fw-bold', kh.isBlacklisted ? 'btn-success' : 'btn-outline-danger']">
+                {{ kh.isBlacklisted ? 'Mở Khóa' : 'Khóa' }}
+              </button>
             </td>
           </tr>
-          <tr v-if="filteredKhachHang.length === 0">
-            <td colspan="6" class="text-center text-muted py-5">
-              <div class="fs-1 mb-2">🔎</div>
-              <h5 v-if="searchKhachHang">Không tìm thấy tài khoản nào khớp với "{{ searchKhachHang }}"</h5>
-              <h5 v-else>Chưa có tài khoản nào trên hệ thống.</h5>
-            </td>
+          <tr v-if="danhSachKhachHangHienThi.length === 0">
+            <td colspan="6" class="text-center py-5 text-muted">Không có tài khoản nào khớp với bộ lọc.</td>
           </tr>
         </tbody>
       </table>
@@ -334,7 +553,7 @@ const thongKeSanPham = computed(() => {
       <div v-if="showDetailHD" class="card p-4 shadow-sm bg-white border-0">
         <div class="row g-3">
           <div class="col-md-4"><label class="fw-bold mb-2">Mã đơn hàng</label><input :value="'#' + selectedHD.id" class="form-control bg-light text-primary fw-bold" readonly></div>
-          <div class="col-md-4"><label class="fw-bold mb-2">Ngày đặt</label><input :value="selectedHD.ngay" class="form-control bg-light" readonly></div>
+          <div class="col-md-4"><label class="fw-bold mb-2">Thời gian mua</label><input :value="selectedHD.ngay" class="form-control bg-light" readonly></div>
           <div class="col-md-4">
             <label class="fw-bold mb-2">Trạng thái</label>
             <select :value="selectedHD.trangThai" @change="handleStatusChange(selectedHD, $event)" 
@@ -387,8 +606,8 @@ const thongKeSanPham = computed(() => {
         <thead class="table-primary">
           <tr>
             <th>Mã ĐH</th>
+            <th>Thời gian mua</th>
             <th>Khách hàng</th>
-            <th>Thanh toán</th>
             <th>Tổng tiền</th>
             <th style="width: 15%">Trạng thái</th>
             <th class="text-center">Thao tác</th>
@@ -397,8 +616,8 @@ const thongKeSanPham = computed(() => {
         <tbody>
           <tr v-for="hd in dsHoaDon" :key="hd.id">
             <td class="fw-bold">#{{ hd.id }}</td>
+            <td class="small text-muted">{{ hd.ngay }}</td>
             <td class="fw-bold text-primary">{{ hd.khach }}</td>
-            <td><span class="badge bg-secondary">{{ hd.phuongThucThanhToan || 'COD' }}</span></td>
             <td class="text-danger fw-bold">{{ Number(hd.tong).toLocaleString() }}đ</td>
             
             <td>
@@ -433,3 +652,27 @@ const thongKeSanPham = computed(() => {
 
   </div>
 </template>
+
+<style scoped>
+.transition-bar { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.custom-scrollbar::-webkit-scrollbar { height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d68910; border-radius: 4px; }
+
+.custom-admin-table td { padding: 15px 10px; border: none; vertical-align: middle; }
+.row-vip {
+  outline: 3px solid #FFD700;
+  background-color: #fffae6 !important;
+  box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3);
+  border-radius: 8px;
+}
+.row-quen {
+  outline: 3px solid #b0bec5 !important;
+  background-color: #f8f9fa !important;
+  box-shadow: 0 4px 10px rgba(176, 190, 197, 0.4);
+  border-radius: 8px;
+}
+.row-thuong {
+  border: 1px solid #e9ecef;
+}
+</style>

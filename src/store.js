@@ -7,7 +7,6 @@ const API_SANPHAM = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/sanpham'
 const API_USERS = 'https://69a1c98a2e82ee536fa237c4.mockapi.io/users'
 const API_DANHMUC = 'https://698042e46570ee87d50e8e0c.mockapi.io/danhmuc'
 const API_HOADON = 'https://698042e46570ee87d50e8e0c.mockapi.io/hoadon'
-// Đã cập nhật link MockAPI Mã giảm giá mới của bạn:
 const API_MAGIAMGIA = 'https://69d34ed0336103955f8ec9e6.mockapi.io/magiamgia'
 
 const matchId = (id1, id2) => String(id1) === String(id2)
@@ -107,6 +106,7 @@ export const filteredProducts = computed(() => {
 export const showFormSP = ref(false)
 export const isEditSP = ref(false)
 export const formSP = ref({ id: null, name: '', price: 0, img: '', category: '', tonKho: 0 })
+
 export const huyFormSP = () => {
   showFormSP.value = false
   isEditSP.value = false
@@ -191,9 +191,7 @@ export const layDuLieuMaGiamGia = async () => {
       const data = await res.json()
       if (Array.isArray(data)) dsMaGiamGia.value = data
     }
-  } catch (e) {
-    console.log('Lỗi tải mã giảm giá:', e)
-  }
+  } catch (e) {}
 }
 layDuLieuMaGiamGia()
 
@@ -258,6 +256,7 @@ export const apDungMaGiamGia = () => {
 
 export const addToCart = (product, qty = 1) => {
   if (product.tonKho <= 0) return alert('Hết hàng!')
+
   const item = cart.value.find((i) => matchId(i.id, product.id) && i.name === product.name)
   const totalThisProductInCart = cart.value
     .filter((i) => matchId(i.id, product.id))
@@ -311,10 +310,11 @@ export const handleCheckout = async () => {
     for (const item of cart.value) {
       const sp = adminSanPhams.value.find((s) => s.id === item.id)
       if (sp) {
+        const dataUpdate = { ...sp, tonKho: sp.tonKho - item.quantity }
         await fetch(`${API_SANPHAM}/${item.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tonKho: sp.tonKho - item.quantity }),
+          body: JSON.stringify(dataUpdate),
         })
       }
     }
@@ -322,8 +322,11 @@ export const handleCheckout = async () => {
     const tienGiam = maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0
     const tongThanhToan = totalAmount.value + phiShip.value - tienGiam
 
+    const d = new Date()
+    const strNgay = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
     const newOrder = {
-      ngay: new Date().toLocaleString('vi-VN'),
+      ngay: strNgay,
       khachId: currentUserProfile.value.id || 'guest',
       khach: currentUserProfile.value.user || 'Khách vãng lai',
       sdt: currentUserProfile.value.phone || 'Không có',
@@ -367,7 +370,7 @@ export const totalItemsInCart = computed(() => {
 })
 
 // ==========================================
-// 5. LOGIC TÀI KHOẢN
+// 5. LOGIC TÀI KHOẢN VÀ HỆ THỐNG VIP TỰ ĐỘNG
 // ==========================================
 export const regUsername = ref('')
 export const regEmail = ref('')
@@ -375,7 +378,16 @@ export const regPhone = ref('')
 export const regPassword = ref('')
 export const regConfirmPassword = ref('')
 export const registeredUsers = ref([])
-export const currentUserProfile = ref({ id: null, user: '', phone: '', email: '', pass: '' })
+
+export const currentUserProfile = ref({
+  id: null,
+  user: '',
+  phone: '',
+  email: '',
+  pass: '',
+  loaiKhach: 'Thường',
+  tongChiTieu: 0,
+})
 
 export const layDuLieuUsers = async () => {
   try {
@@ -387,6 +399,61 @@ export const layDuLieuUsers = async () => {
   } catch (e) {}
 }
 layDuLieuUsers()
+
+// ĐÃ SỬA: BẢO LƯU HẠNG KHÁCH HÀNG (Không tự động giáng cấp)
+export const tinhLaiTongChiTieu = async (khachId) => {
+  if (!khachId || khachId === 'guest' || khachId === 'test') return
+
+  const userIndex = registeredUsers.value.findIndex((u) => String(u.id) === String(khachId))
+  if (userIndex === -1) return
+
+  const userGoc = registeredUsers.value[userIndex]
+
+  const tongTienDuyet = dsHoaDon.value
+    .filter((hd) => String(hd.khachId) === String(khachId) && hd.trangThai === 'Hoàn thành')
+    .reduce((sum, hd) => sum + Number(hd.tong), 0)
+
+  // Tính xem với số tiền này thì xứng đáng hạng gì
+  let loaiMoiThucTe = 'Thường'
+  if (tongTienDuyet >= 1000000) loaiMoiThucTe = 'VIP'
+  else if (tongTienDuyet >= 500000) loaiMoiThucTe = 'Quen'
+
+  // CHIẾN THUẬT BẢO LƯU: So sánh cấp bậc. Chỉ cho Lên hạng, không cho Xuống.
+  const capBac = { Thường: 1, Quen: 2, VIP: 3 }
+  let loaiChot = userGoc.loaiKhach || 'Thường'
+
+  // Nếu hạng tính ra CAO HƠN hạng hiện tại -> Nâng cấp. Còn thấp hơn thì KỆ NÓ (giữ nguyên).
+  if (capBac[loaiMoiThucTe] > capBac[loaiChot]) {
+    loaiChot = loaiMoiThucTe
+  }
+
+  if (userGoc.tongChiTieu !== tongTienDuyet || userGoc.loaiKhach !== loaiChot) {
+    const dataUpdate = { ...userGoc, tongChiTieu: tongTienDuyet, loaiKhach: loaiChot }
+
+    try {
+      const res = await fetch(`${API_USERS}/${khachId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataUpdate),
+      })
+
+      if (res.ok) {
+        registeredUsers.value[userIndex].tongChiTieu = tongTienDuyet
+        registeredUsers.value[userIndex].loaiKhach = loaiChot
+
+        if (
+          currentUserProfile.value.id &&
+          String(currentUserProfile.value.id) === String(khachId)
+        ) {
+          currentUserProfile.value.tongChiTieu = tongTienDuyet
+          currentUserProfile.value.loaiKhach = loaiChot
+        }
+      }
+    } catch (e) {
+      console.log('Lỗi cập nhật hạng:', e)
+    }
+  }
+}
 
 export const handleRegister = async () => {
   if (!regUsername.value || !regEmail.value || !regPhone.value || !regPassword.value)
@@ -409,6 +476,8 @@ export const handleRegister = async () => {
         email: regEmail.value,
         phone: regPhone.value,
         isBlacklisted: false,
+        loaiKhach: 'Thường',
+        tongChiTieu: 0,
       }),
     })
     if (res.ok) {
@@ -444,6 +513,8 @@ export const handleLogin = () => {
       phone: '0912345678',
       email: 'test@gmail.com',
       pass: '123',
+      loaiKhach: 'Thường',
+      tongChiTieu: 0,
     }
     currentView.value = 'client'
   } else {
@@ -456,7 +527,35 @@ export const handleLogout = () => {
     currentView.value = 'client'
     username.value = ''
     password.value = ''
-    currentUserProfile.value = { id: null, user: '', phone: '', email: '', pass: '' }
+    currentUserProfile.value = {
+      id: null,
+      user: '',
+      phone: '',
+      email: '',
+      pass: '',
+      loaiKhach: 'Thường',
+      tongChiTieu: 0,
+    }
+  }
+}
+
+export const capNhatLoaiKhach = async (userId, loaiMoi) => {
+  const userGoc = registeredUsers.value.find((u) => String(u.id) === String(userId))
+  if (!userGoc) return
+  const dataUpdate = { ...userGoc, loaiKhach: loaiMoi } // ÉP THEO Ý CỦA ADMIN
+
+  try {
+    const res = await fetch(`${API_USERS}/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataUpdate),
+    })
+    if (res.ok) {
+      await layDuLieuUsers()
+      alert('Đã cập nhật loại khách hàng thành công!')
+    }
+  } catch (e) {
+    alert('Lỗi cập nhật loại khách!')
   }
 }
 
@@ -481,11 +580,14 @@ export const toggleBlacklist = async (user) => {
   const newStatus = !user.isBlacklisted
   const actionName = newStatus ? 'KHÓA' : 'MỞ KHÓA'
   if (!confirm(`Xác nhận ${actionName} tài khoản "${user.user}"?`)) return
+
+  const dataUpdate = { ...user, isBlacklisted: newStatus }
+
   try {
     const res = await fetch(`${API_USERS}/${user.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isBlacklisted: newStatus }),
+      body: JSON.stringify(dataUpdate),
     })
     if (res.ok) {
       await layDuLieuUsers()
@@ -516,7 +618,6 @@ export const filteredKhachHang = computed(() => {
 export const dsHoaDon = ref([])
 export const showDetailHD = ref(false)
 export const selectedHD = ref(null)
-export const selectedOrderIds = ref([])
 
 export const xemHoaDon = (hd) => {
   selectedHD.value = hd
@@ -541,14 +642,30 @@ layDuLieuHoaDon()
 
 export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
   if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return false
+
+  const hdGoc = dsHoaDon.value.find((h) => String(h.id) === String(id))
+  if (!hdGoc) return false
+
+  const dataUpdate = { ...hdGoc, trangThai: trangThaiMoi }
+
   try {
     const res = await fetch(`${API_HOADON}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trangThai: trangThaiMoi }),
+      body: JSON.stringify(dataUpdate),
     })
     if (res.ok) {
+      const hdIndex = dsHoaDon.value.findIndex((h) => String(h.id) === String(id))
+      if (hdIndex !== -1) {
+        dsHoaDon.value[hdIndex].trangThai = trangThaiMoi
+      }
+
       await layDuLieuHoaDon()
+
+      const hdUpdated = dsHoaDon.value.find((h) => String(h.id) === String(id))
+      if (hdUpdated && hdUpdated.khachId) {
+        await tinhLaiTongChiTieu(hdUpdated.khachId)
+      }
       return true
     }
   } catch (e) {
@@ -557,23 +674,26 @@ export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
   return false
 }
 
-// Bỏ hàm xacNhanDonHangHangLoat vì bạn đã yêu cầu xóa nút này.
-
 // ==========================================
 // 8. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
 // ==========================================
 export const handleUpdateProfile = async () => {
   if (!currentUserProfile.value.user || !currentUserProfile.value.phone)
     return alert('Vui lòng điền đủ thông tin!')
+
+  const userGoc = currentUserProfile.value
+  const dataUpdate = {
+    ...userGoc,
+    user: userGoc.user,
+    phone: userGoc.phone,
+    email: userGoc.email,
+  }
+
   try {
     const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user: currentUserProfile.value.user,
-        phone: currentUserProfile.value.phone,
-        email: currentUserProfile.value.email,
-      }),
+      body: JSON.stringify(dataUpdate),
     })
     if (res.ok) {
       alert('Cập nhật thông tin lên hệ thống thành công!')
@@ -596,11 +716,15 @@ export const handleChangePassword = async () => {
     return alert('Mật khẩu cũ không chính xác!')
   if (newPassword.value.length < 6) return alert('Mật khẩu mới phải từ 6 ký tự!')
   if (newPassword.value !== confirmNewPassword.value) return alert('Mật khẩu xác nhận không khớp!')
+
+  const userGoc = currentUserProfile.value
+  const dataUpdate = { ...userGoc, pass: newPassword.value }
+
   try {
     const res = await fetch(`${API_USERS}/${currentUserProfile.value.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pass: newPassword.value }),
+      body: JSON.stringify(dataUpdate),
     })
     if (res.ok) {
       alert('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.')

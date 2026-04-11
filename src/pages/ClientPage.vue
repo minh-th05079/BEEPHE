@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { dsDanhMuc, filteredProducts, addToCart, activeCategory, searchQuery } from '../store.js'
+import { dsDanhMuc, filteredProducts, addToCart, activeCategory, searchQuery, currentUserProfile } from '../store.js'
 
 const selectedProduct = ref(null)
 
@@ -12,6 +12,7 @@ const selectedQuantity = ref(1)
 const currentPrice = computed(() => {
   if (!selectedProduct.value) return 0
   let basePrice = selectedProduct.value.price
+  
   if (selectedSize.value === 'M') basePrice += 5000
   if (selectedSize.value === 'L') basePrice += 10000
   return basePrice
@@ -25,14 +26,12 @@ const openDetail = (item) => {
   selectedQuantity.value = 1 
 }
 
-// Hàm giảm số lượng
 const decreaseQuantity = () => {
   if (selectedQuantity.value > 1) {
     selectedQuantity.value--
   }
 }
 
-// Hàm tăng số lượng
 const increaseQuantity = () => {
   if (selectedProduct.value && selectedQuantity.value < selectedProduct.value.tonKho) {
     selectedQuantity.value++
@@ -96,7 +95,10 @@ const confirmAddToCart = () => {
       <div class="row g-4 justify-content-center">
         <div class="col-6 col-md-4 col-lg-3" v-for="item in filteredProducts" :key="item.id">
           
-          <div :class="['card bg-white h-100 shadow-sm border-0 position-relative transition-hover', item.tonKho <= 0 ? 'opacity-75' : '']">
+          <div :class="['card bg-white h-100 shadow-sm position-relative transition-hover', 
+                        item.tonKho <= 0 ? 'opacity-75' : '',
+                        currentUserProfile.loaiKhach === 'VIP' ? 'card-vip' : 
+                        currentUserProfile.loaiKhach === 'Quen' ? 'card-quen' : 'border-0']">
             <div v-if="item.tonKho <= 0" class="position-absolute top-50 start-50 translate-middle w-100 text-center" style="z-index: 2;">
               <span class="badge bg-danger fs-5 py-2 px-3 shadow rounded-pill">ĐÃ HẾT HÀNG</span>
             </div>
@@ -134,7 +136,9 @@ const confirmAddToCart = () => {
     
     <div v-if="selectedProduct" class="modal fade show d-block" tabindex="-1" style="z-index: 1065;" @click.self="selectedProduct = null">
       <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden position-relative animate-pop">
+        <div :class="['modal-content border-0 shadow-lg rounded-4 overflow-hidden position-relative animate-pop',
+                      currentUserProfile.loaiKhach === 'VIP' ? 'modal-vip' : 
+                      currentUserProfile.loaiKhach === 'Quen' ? 'modal-quen' : '']">
           
           <button @click="selectedProduct = null" class="btn-close position-absolute top-0 end-0 m-3 z-3" style="background-color: white; padding: 10px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></button>
           
@@ -205,7 +209,7 @@ const confirmAddToCart = () => {
                 {{ selectedProduct.tonKho > 0 ? `🛒 THÊM VÀO GIỎ - ${(currentPrice * selectedQuantity).toLocaleString()}đ` : 'TẠM THỜI KHÔNG THỂ MUA' }}
               </button>
               
-             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -222,6 +226,41 @@ const confirmAddToCart = () => {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
 }
+
+/* ==================================== */
+/* HIỆU ỨNG THẺ SẢN PHẨM KHÁCH VIP      */
+/* ==================================== */
+.card-vip {
+  border: 2px solid #D4AF37 !important; /* Vàng hoàng gia */
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.4) !important;
+  background: linear-gradient(to bottom, #fffef7, #ffffff) !important;
+}
+.card-vip:hover {
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.9) !important;
+  border-color: #FFDF00 !important;
+}
+.modal-vip {
+  border: 4px solid #D4AF37 !important;
+  box-shadow: 0 0 40px rgba(212, 175, 55, 0.8) !important;
+}
+
+/* ==================================== */
+/* HIỆU ỨNG THẺ SẢN PHẨM KHÁCH QUEN     */
+/* ==================================== */
+.card-quen {
+  border: 2px solid #b0bec5 !important; /* Bạch kim */
+  box-shadow: 0 0 12px rgba(176, 190, 197, 0.5) !important;
+  background: linear-gradient(to bottom, #fdfdfd, #ffffff) !important;
+}
+.card-quen:hover {
+  box-shadow: 0 0 25px rgba(176, 190, 197, 1) !important;
+  border-color: #E5E4E2 !important;
+}
+.modal-quen {
+  border: 4px solid #E5E4E2 !important;
+  box-shadow: 0 0 40px rgba(176, 190, 197, 0.8) !important;
+}
+
 .mix-blend-multiply {
   mix-blend-mode: multiply;
 }

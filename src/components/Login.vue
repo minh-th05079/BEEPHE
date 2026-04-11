@@ -6,12 +6,7 @@ import { username, password, handleLogin, currentView } from '../store.js'
   <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow p-4 bg-white" style="width: 400px;">
       <h3 class="text-center mb-4 text-primary fw-bold">BEEPHE Login</h3>
-    
-      <div class="alert alert-info py-2" style="font-size: 0.9rem">
-        <small><b>Khách:</b> kh123 / 123</small><br>
-        <small><b>Admin:</b> admin / 123</small>
-      </div>
-      
+          
       <div class="mb-3">
         <label class="form-label fw-bold">Tài khoản / Email / SĐT</label>
         <input v-model="username" type="text" class="form-control" placeholder="Nhập tên tài khoản, email hoặc SĐT...">
