@@ -39,11 +39,9 @@ const isStatusDisabled = (currentStatus, targetStatus) => {
   if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') return true;
   if (currentStatus === targetStatus) return false;
   if (targetStatus === 'Đã hủy') return false;
-
   const order = ['Chờ xác nhận', 'Đang làm', 'Đang giao', 'Hoàn thành'];
   const currentIndex = order.indexOf(currentStatus);
   const targetIndex = order.indexOf(targetStatus);
-
   return targetIndex <= currentIndex;
 };
 
@@ -261,20 +259,21 @@ const danhSachKhachHangHienThi = computed(() => {
         </div>
 
         <div v-if="chartIndex === 0" class="chart-container custom-scrollbar pb-2" style="overflow-x: auto; padding-left: 45px; padding-right: 20px;">
-          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 30px; padding-top: 20px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
+          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 30px; padding-top: 20px; margin-bottom: 35px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
             
             <div v-for="step in getGridSteps(thongKeSanPham[0]?.daBan || 0)" :key="step" 
                  class="position-absolute w-100" 
                  :style="{ bottom: (step / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
-               <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+                <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
             </div>
 
-            <div v-for="sp in thongKeSanPham.slice(0, 15)" :key="sp.id" class="d-flex flex-column align-items-center" style="width: 80px; z-index: 1; margin-left: 10px;">
+            <div v-for="sp in thongKeSanPham.slice(0, 15)" :key="sp.id" class="d-flex flex-column align-items-center position-relative" style="width: 80px; z-index: 1; margin-left: 10px;">
               <span class="small fw-bold text-danger mb-1 bg-white px-2 rounded shadow-sm">{{ sp.daBan }}</span>
               <div class="bg-warning w-100 rounded-top shadow-sm transition-bar" 
                    :style="{ height: (sp.daBan / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px' }"
                    :title="'Doanh thu: ' + sp.doanhThu.toLocaleString() + 'đ'"></div>
-              <span class="small text-truncate w-100 text-center mt-2 fw-bold" :title="sp.name">{{ sp.name }}</span>
+              
+              <span class="small text-truncate w-100 text-center fw-bold position-absolute" style="top: 100%; padding-top: 8px;" :title="sp.name">{{ sp.name }}</span>
             </div>
             
             <div v-if="thongKeSanPham.length === 0" class="w-100 text-center text-muted position-absolute" style="bottom: 10px;">Không có dữ liệu trong thời gian này.</div>
@@ -282,19 +281,20 @@ const danhSachKhachHangHienThi = computed(() => {
         </div>
 
         <div v-if="chartIndex === 1" class="chart-container custom-scrollbar pb-2" style="overflow-x: auto; padding-left: 45px; padding-right: 20px;">
-          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 40px; padding-top: 20px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
+          <div class="d-flex align-items-end justify-content-start position-relative" style="height: 300px; min-width: max-content; gap: 40px; padding-top: 20px; margin-bottom: 35px; border-bottom: 2px solid #6c757d; border-left: 2px solid #6c757d;">
             
             <div v-for="step in getGridSteps(thongKeDanhMuc[0]?.daBan || 0)" :key="step" 
                  class="position-absolute w-100" 
                  :style="{ bottom: (step / getChartMax(thongKeDanhMuc[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
-               <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+                <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
             </div>
 
-            <div v-for="dm in thongKeDanhMuc" :key="dm.name" class="d-flex flex-column align-items-center" style="width: 120px; z-index: 1; margin-left: 20px;">
+            <div v-for="dm in thongKeDanhMuc" :key="dm.name" class="d-flex flex-column align-items-center position-relative" style="width: 120px; z-index: 1; margin-left: 20px;">
               <span class="small fw-bold text-primary mb-1 bg-white px-2 rounded shadow-sm">{{ dm.daBan }}</span>
               <div class="bg-info w-100 rounded-top shadow-sm transition-bar" 
                    :style="{ height: (dm.daBan / getChartMax(thongKeDanhMuc[0]?.daBan || 0) * 230) + 'px' }"></div>
-              <span class="small w-100 text-center mt-2 fw-bold text-wrap">{{ dm.name }}</span>
+              
+              <span class="small w-100 text-center fw-bold text-wrap position-absolute" style="top: 100%; padding-top: 8px;">{{ dm.name }}</span>
             </div>
 
             <div v-if="thongKeDanhMuc.length === 0" class="w-100 text-center text-muted position-absolute" style="bottom: 10px;">Không có dữ liệu trong thời gian này.</div>
@@ -339,7 +339,7 @@ const danhSachKhachHangHienThi = computed(() => {
           <h5 class="fw-bold text-warning p-3 m-0 border-bottom">📝 Lịch sử Giao dịch chi tiết của Đồ uống</h5>
           <table class="table table-hover align-middle mb-0 text-center">
             <thead class="table-warning text-dark">
-               <tr>
+              <tr>
                 <th>Mã Đơn Hàng</th>
                 <th>Thời gian bán</th>
                 <th>Khách Hàng</th>
