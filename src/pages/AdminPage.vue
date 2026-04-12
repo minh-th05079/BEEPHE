@@ -34,6 +34,19 @@ const handleCancelOrder = async (hd) => {
   }
 }
 
+// --- HÀM MỚI THÊM: CHẶN LÙI TRẠNG THÁI TRÊN GIAO DIỆN ---
+const isStatusDisabled = (currentStatus, targetStatus) => {
+  if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') return true;
+  if (currentStatus === targetStatus) return false;
+  if (targetStatus === 'Đã hủy') return false;
+
+  const order = ['Chờ xác nhận', 'Đang làm', 'Đang giao', 'Hoàn thành'];
+  const currentIndex = order.indexOf(currentStatus);
+  const targetIndex = order.indexOf(targetStatus);
+
+  return targetIndex <= currentIndex;
+};
+
 // ==========================================
 // THỐNG KÊ (Biểu đồ, Lọc Ngày/Tháng/Năm, Lọc Đồ Uống)
 // ==========================================
@@ -165,7 +178,7 @@ const thongKeDanhMuc = computed(() => {
 // LOGIC VẼ LƯỚI CHO BIỂU ĐỒ (Cách nhau 5 ly)
 const getChartMax = (maxValue) => {
   if (!maxValue || maxValue < 5) return 5;
-  return Math.ceil(maxValue / 5) * 5; // Làm tròn lên mốc 5 (ví dụ 12 ly -> max cột là 15)
+  return Math.ceil(maxValue / 5) * 5;
 }
 const getGridSteps = (maxValue) => {
   const max = getChartMax(maxValue);
@@ -213,7 +226,6 @@ const danhSachKhachHangHienThi = computed(() => {
               <option value="thang">Chỉ chọn Tháng/Năm</option>
               <option value="nam">Chỉ chọn Năm</option>
             </select>
-            
             <input v-if="loaiThoiGian === 'ngay'" type="date" v-model="thongKeDate" class="form-control border-info shadow-sm">
             <input v-if="loaiThoiGian === 'thang'" type="month" v-model="thongKeMonth" class="form-control border-info shadow-sm">
             <select v-if="loaiThoiGian === 'nam'" v-model="thongKeYear" class="form-select border-info shadow-sm">
@@ -254,14 +266,14 @@ const danhSachKhachHangHienThi = computed(() => {
             <div v-for="step in getGridSteps(thongKeSanPham[0]?.daBan || 0)" :key="step" 
                  class="position-absolute w-100" 
                  :style="{ bottom: (step / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
-              <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+               <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
             </div>
 
             <div v-for="sp in thongKeSanPham.slice(0, 15)" :key="sp.id" class="d-flex flex-column align-items-center" style="width: 80px; z-index: 1; margin-left: 10px;">
               <span class="small fw-bold text-danger mb-1 bg-white px-2 rounded shadow-sm">{{ sp.daBan }}</span>
               <div class="bg-warning w-100 rounded-top shadow-sm transition-bar" 
                    :style="{ height: (sp.daBan / getChartMax(thongKeSanPham[0]?.daBan || 0) * 230) + 'px' }"
-                   title="Doanh thu: {{ sp.doanhThu.toLocaleString() }}đ"></div>
+                   :title="'Doanh thu: ' + sp.doanhThu.toLocaleString() + 'đ'"></div>
               <span class="small text-truncate w-100 text-center mt-2 fw-bold" :title="sp.name">{{ sp.name }}</span>
             </div>
             
@@ -275,7 +287,7 @@ const danhSachKhachHangHienThi = computed(() => {
             <div v-for="step in getGridSteps(thongKeDanhMuc[0]?.daBan || 0)" :key="step" 
                  class="position-absolute w-100" 
                  :style="{ bottom: (step / getChartMax(thongKeDanhMuc[0]?.daBan || 0) * 230) + 'px', left: 0, borderTop: '1px dashed #adb5bd', zIndex: 0 }">
-              <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
+               <span class="position-absolute text-muted small fw-bold" style="left: -38px; top: -10px;">{{ step }} ly</span>
             </div>
 
             <div v-for="dm in thongKeDanhMuc" :key="dm.name" class="d-flex flex-column align-items-center" style="width: 120px; z-index: 1; margin-left: 20px;">
@@ -327,7 +339,7 @@ const danhSachKhachHangHienThi = computed(() => {
           <h5 class="fw-bold text-warning p-3 m-0 border-bottom">📝 Lịch sử Giao dịch chi tiết của Đồ uống</h5>
           <table class="table table-hover align-middle mb-0 text-center">
             <thead class="table-warning text-dark">
-              <tr>
+               <tr>
                 <th>Mã Đơn Hàng</th>
                 <th>Thời gian bán</th>
                 <th>Khách Hàng</th>
@@ -560,11 +572,11 @@ const danhSachKhachHangHienThi = computed(() => {
               class="form-select fw-bold bg-light border-primary text-primary"
               :disabled="selectedHD.trangThai === 'Hoàn thành' || selectedHD.trangThai === 'Đã hủy'"
             >
-              <option value="Chờ xác nhận">Chờ xác nhận</option>
-              <option value="Đang làm">Đang làm</option>
-              <option value="Đang giao">Đang giao</option>
-              <option value="Hoàn thành">Hoàn thành</option>
-              <option value="Đã hủy">Đã hủy</option>
+              <option value="Chờ xác nhận" :disabled="isStatusDisabled(selectedHD.trangThai, 'Chờ xác nhận')">Chờ xác nhận</option>
+              <option value="Đang làm" :disabled="isStatusDisabled(selectedHD.trangThai, 'Đang làm')">Đang làm</option>
+              <option value="Đang giao" :disabled="isStatusDisabled(selectedHD.trangThai, 'Đang giao')">Đang giao</option>
+              <option value="Hoàn thành" :disabled="isStatusDisabled(selectedHD.trangThai, 'Hoàn thành')">Hoàn thành</option>
+              <option value="Đã hủy" :disabled="isStatusDisabled(selectedHD.trangThai, 'Đã hủy')">Đã hủy</option>
             </select>
           </div>
           
@@ -631,11 +643,11 @@ const danhSachKhachHangHienThi = computed(() => {
                 }]"
                 :disabled="hd.trangThai === 'Hoàn thành' || hd.trangThai === 'Đã hủy'"
               >
-                <option value="Chờ xác nhận" class="text-dark">Chờ xác nhận</option>
-                <option value="Đang làm" class="text-dark">Đang làm</option>
-                <option value="Đang giao" class="text-dark">Đang giao</option>
-                <option value="Hoàn thành" class="text-dark">Hoàn thành</option>
-                <option value="Đã hủy" class="text-dark">Đã hủy</option>
+                <option value="Chờ xác nhận" class="text-dark" :disabled="isStatusDisabled(hd.trangThai, 'Chờ xác nhận')">Chờ xác nhận</option>
+                <option value="Đang làm" class="text-dark" :disabled="isStatusDisabled(hd.trangThai, 'Đang làm')">Đang làm</option>
+                <option value="Đang giao" class="text-dark" :disabled="isStatusDisabled(hd.trangThai, 'Đang giao')">Đang giao</option>
+                <option value="Hoàn thành" class="text-dark" :disabled="isStatusDisabled(hd.trangThai, 'Hoàn thành')">Hoàn thành</option>
+                <option value="Đã hủy" class="text-dark" :disabled="isStatusDisabled(hd.trangThai, 'Đã hủy')">Đã hủy</option>
               </select>
             </td>
 

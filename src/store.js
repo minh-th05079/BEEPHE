@@ -297,6 +297,15 @@ export const removeCartItem = (index) => {
   cart.value.splice(index, 1)
 }
 
+// Tính tiền giảm giá theo Hạng Khách Hàng (VIP giảm 10%, Quen giảm 5%)
+export const tienGiamHangKhach = computed(() => {
+  if (!currentUserProfile.value || !currentUserProfile.value.loaiKhach) return 0
+  const tongTienHang = totalAmount.value
+  if (currentUserProfile.value.loaiKhach === 'VIP') return tongTienHang * 0.1 // 10%
+  if (currentUserProfile.value.loaiKhach === 'Quen') return tongTienHang * 0.05 // 5%
+  return 0 // Khách Thường không giảm
+})
+
 export const handleCheckout = async () => {
   if (cart.value.length === 0) return
 
@@ -319,8 +328,10 @@ export const handleCheckout = async () => {
       }
     }
 
-    const tienGiam = maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0
-    const tongThanhToan = totalAmount.value + phiShip.value - tienGiam
+    // --- CẬP NHẬT LOGIC TÍNH TIỀN ---
+    const tienGiamMGG = maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0
+    const tongTienGiam = tienGiamMGG + tienGiamHangKhach.value
+    const tongThanhToan = totalAmount.value + phiShip.value - tongTienGiam
 
     const d = new Date()
     const strNgay = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -337,7 +348,7 @@ export const handleCheckout = async () => {
       danhSachMon: cart.value,
       phuongThucThanhToan: phuongThucThanhToan.value,
       maGiamGia: maGiamGiaApDung.value ? maGiamGiaApDung.value.code : 'Không có',
-      tienGiam: tienGiam,
+      tienGiam: tongTienGiam,
       tienShip: phiShip.value,
     }
 
@@ -400,7 +411,6 @@ export const layDuLieuUsers = async () => {
 }
 layDuLieuUsers()
 
-// ĐÃ SỬA: BẢO LƯU HẠNG KHÁCH HÀNG (Không tự động giáng cấp)
 export const tinhLaiTongChiTieu = async (khachId) => {
   if (!khachId || khachId === 'guest' || khachId === 'test') return
 
@@ -413,16 +423,13 @@ export const tinhLaiTongChiTieu = async (khachId) => {
     .filter((hd) => String(hd.khachId) === String(khachId) && hd.trangThai === 'Hoàn thành')
     .reduce((sum, hd) => sum + Number(hd.tong), 0)
 
-  // Tính xem với số tiền này thì xứng đáng hạng gì
   let loaiMoiThucTe = 'Thường'
   if (tongTienDuyet >= 1000000) loaiMoiThucTe = 'VIP'
   else if (tongTienDuyet >= 500000) loaiMoiThucTe = 'Quen'
 
-  // CHIẾN THUẬT BẢO LƯU: So sánh cấp bậc. Chỉ cho Lên hạng, không cho Xuống.
   const capBac = { Thường: 1, Quen: 2, VIP: 3 }
   let loaiChot = userGoc.loaiKhach || 'Thường'
 
-  // Nếu hạng tính ra CAO HƠN hạng hiện tại -> Nâng cấp. Còn thấp hơn thì KỆ NÓ (giữ nguyên).
   if (capBac[loaiMoiThucTe] > capBac[loaiChot]) {
     loaiChot = loaiMoiThucTe
   }
@@ -542,7 +549,7 @@ export const handleLogout = () => {
 export const capNhatLoaiKhach = async (userId, loaiMoi) => {
   const userGoc = registeredUsers.value.find((u) => String(u.id) === String(userId))
   if (!userGoc) return
-  const dataUpdate = { ...userGoc, loaiKhach: loaiMoi } // ÉP THEO Ý CỦA ADMIN
+  const dataUpdate = { ...userGoc, loaiKhach: loaiMoi }
 
   try {
     const res = await fetch(`${API_USERS}/${userId}`, {
@@ -613,7 +620,7 @@ export const filteredKhachHang = computed(() => {
 })
 
 // ==========================================
-// 7. QUẢN LÝ ĐƠN HÀNG & DUYỆT ĐƠN
+// 7. QUẢN LÝ ĐƠN HÀNG & DUYỆT ĐƠN (ONE-WAY FLOW)
 // ==========================================
 export const dsHoaDon = ref([])
 export const showDetailHD = ref(false)
@@ -641,10 +648,26 @@ export const layDuLieuHoaDon = async () => {
 layDuLieuHoaDon()
 
 export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
-  if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return false
-
   const hdGoc = dsHoaDon.value.find((h) => String(h.id) === String(id))
   if (!hdGoc) return false
+
+  const currentStatus = hdGoc.trangThai
+
+  if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') {
+    alert('Đơn hàng này đã kết thúc, không thể cập nhật trạng thái nữa!')
+    return false
+  }
+
+  const order = ['Chờ xác nhận', 'Đang làm', 'Đang giao', 'Hoàn thành']
+  const currentIndex = order.indexOf(currentStatus)
+  const newIndex = order.indexOf(trangThaiMoi)
+
+  if (trangThaiMoi !== 'Đã hủy' && newIndex <= currentIndex) {
+    alert('Không thể lùi trạng thái đơn hàng về trước đó!')
+    return false
+  }
+
+  if (!confirm(`Xác nhận đổi đơn hàng này sang trạng thái: "${trangThaiMoi}"?`)) return false
 
   const dataUpdate = { ...hdGoc, trangThai: trangThaiMoi }
 
@@ -654,6 +677,7 @@ export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dataUpdate),
     })
+
     if (res.ok) {
       const hdIndex = dsHoaDon.value.findIndex((h) => String(h.id) === String(id))
       if (hdIndex !== -1) {
@@ -675,7 +699,7 @@ export const capNhatTrangThaiHoaDon = async (id, trangThaiMoi) => {
 }
 
 // ==========================================
-// 8. PROFILE CÁ NHÂN & QUÊN MẬT KHẨU
+// 8. PROFILE CÁ NHÂN
 // ==========================================
 export const handleUpdateProfile = async () => {
   if (!currentUserProfile.value.user || !currentUserProfile.value.phone)
@@ -739,9 +763,86 @@ export const handleChangePassword = async () => {
   }
 }
 
-export const forgotEmail = ref('')
-export const handleForgotPassword = () => {
-  alert(`Đã gửi yêu cầu vào "${forgotEmail.value}".`)
+// ==========================================
+// 9. QUÊN MẬT KHẨU (OTP MÔ PHỎNG)
+// ==========================================
+export const forgotStep = ref(1) // 1: Tên TK, 2: SDT/Email, 3: OTP, 4: Pass mới
+export const forgotUsername = ref('')
+export const forgotContact = ref('')
+export const forgotOtpInput = ref('')
+export const generatedOtp = ref('')
+export const userToReset = ref(null)
+export const forgotNewPass = ref('')
+export const forgotConfirmPass = ref('')
+
+// Bước 1: Check tài khoản
+export const checkForgotUsername = () => {
+  if (!forgotUsername.value) return alert('Vui lòng nhập tên tài khoản!')
+  const user = registeredUsers.value.find((u) => u.user === forgotUsername.value.trim())
+  if (user) {
+    userToReset.value = user
+    forgotStep.value = 2 // Sang bước 2
+  } else {
+    alert('Không tìm thấy tài khoản này trong hệ thống!')
+  }
+}
+
+// Bước 2: Check SDT/Email và tạo OTP
+export const checkForgotContact = () => {
+  const contact = forgotContact.value.trim()
+  if (!contact) return alert('Vui lòng nhập Email hoặc Số điện thoại!')
+
+  if (contact === userToReset.value.email || contact === userToReset.value.phone) {
+    // Tạo mã OTP ngẫu nhiên 6 số
+    generatedOtp.value = Math.floor(100000 + Math.random() * 900000).toString()
+    alert(`[THÔNG BÁO MÔ PHỎNG] Mã OTP của bạn là: ${generatedOtp.value}`)
+    forgotStep.value = 3 // Sang bước 3
+  } else {
+    alert('Thông tin liên hệ không khớp với tài khoản này!')
+  }
+}
+
+// Bước 3: Xác thực OTP
+export const verifyForgotOtp = () => {
+  if (forgotOtpInput.value === generatedOtp.value) {
+    forgotStep.value = 4 // Sang bước 4
+  } else {
+    alert('Mã OTP không chính xác!')
+  }
+}
+
+// Bước 4: Lưu mật khẩu mới
+export const resetPasswordSubmit = async () => {
+  if (forgotNewPass.value.length < 6) return alert('Mật khẩu mới phải từ 6 ký tự!')
+  if (forgotNewPass.value !== forgotConfirmPass.value) return alert('Mật khẩu xác nhận không khớp!')
+
+  const dataUpdate = { ...userToReset.value, pass: forgotNewPass.value }
+  try {
+    const res = await fetch(`${API_USERS}/${userToReset.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataUpdate),
+    })
+    if (res.ok) {
+      alert('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.')
+      await layDuLieuUsers()
+      huyForgotPassword() // Reset form và về Login
+    } else {
+      alert('Lỗi cập nhật trên MockAPI!')
+    }
+  } catch (e) {
+    alert('Lỗi mạng!')
+  }
+}
+
+export const huyForgotPassword = () => {
+  forgotStep.value = 1
+  forgotUsername.value = ''
+  forgotContact.value = ''
+  forgotOtpInput.value = ''
+  generatedOtp.value = ''
+  userToReset.value = null
+  forgotNewPass.value = ''
+  forgotConfirmPass.value = ''
   currentView.value = 'login'
-  forgotEmail.value = ''
 }

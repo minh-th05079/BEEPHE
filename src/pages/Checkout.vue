@@ -2,12 +2,13 @@
 import { computed } from 'vue'
 import { 
   cart, totalAmount, removeCartItem, handleCheckout,
-  phuongThucThanhToan, maGiamGiaNhap, maGiamGiaApDung, apDungMaGiamGia, phiShip, currentView
+  phuongThucThanhToan, maGiamGiaNhap, maGiamGiaApDung, apDungMaGiamGia, phiShip, currentView,
+  currentUserProfile, tienGiamHangKhach
 } from '../store.js'
 
-const tienGiam = computed(() => maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0)
+const tienGiamMGG = computed(() => maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0)
 const tongThanhToan = computed(() => {
-  const tong = totalAmount.value + phiShip.value - tienGiam.value
+  const tong = totalAmount.value + phiShip.value - tienGiamMGG.value - tienGiamHangKhach.value
   return tong > 0 ? tong : 0
 })
 </script>
@@ -81,9 +82,15 @@ const tongThanhToan = computed(() => {
               <span class="text-muted">Phí giao hàng:</span>
               <span class="fw-bold">{{ phiShip.toLocaleString() }}đ</span>
             </div>
+            
+            <div v-if="tienGiamHangKhach > 0" class="d-flex justify-content-between mb-2 text-warning fw-bold">
+              <span>Đặc quyền khách {{ currentUserProfile.loaiKhach }} ({{ currentUserProfile.loaiKhach === 'VIP' ? '10%' : '5%' }}):</span>
+              <span>-{{ tienGiamHangKhach.toLocaleString() }}đ</span>
+            </div>
+
             <div v-if="maGiamGiaApDung" class="d-flex justify-content-between mb-2 text-success">
-              <span>Giảm giá:</span>
-              <span class="fw-bold">-{{ tienGiam.toLocaleString() }}đ</span>
+              <span>Giảm giá (Voucher):</span>
+              <span class="fw-bold">-{{ tienGiamMGG.toLocaleString() }}đ</span>
             </div>
             <hr>
             <div class="d-flex justify-content-between mb-4">
