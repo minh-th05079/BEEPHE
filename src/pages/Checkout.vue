@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { 
   cart, totalAmount, removeCartItem, handleCheckout,
   phuongThucThanhToan, maGiamGiaNhap, maGiamGiaApDung, apDungMaGiamGia, phiShip, currentView,
-  currentUserProfile, tienGiamHangKhach
+  currentUserProfile, tienGiamHangKhach, diaChiGiaoHang
 } from '../store.js'
 
 const tienGiamMGG = computed(() => maGiamGiaApDung.value ? maGiamGiaApDung.value.giamGia : 0)
@@ -28,6 +28,15 @@ const tongThanhToan = computed(() => {
               <img :src="item.img" width="70" height="70" class="rounded border me-3" style="object-fit: cover;">
               <div class="flex-grow-1">
                 <h6 class="fw-bold mb-1">{{ item.name }}</h6>
+                
+                <small class="text-secondary d-block mb-1 fw-semibold" v-if="item.cartOptions">
+                  <span v-for="(val, key, i) in item.cartOptions" :key="key">
+                    <span v-if="key === 'size'">Size {{ val }}</span>
+                    <span v-else>{{ val }}</span>
+                    <span v-if="i < Object.keys(item.cartOptions).length - 1"> | </span>
+                  </span>
+                </small>
+
                 <span class="text-muted small">{{ Number(item.price).toLocaleString() }}đ x {{ item.quantity }}</span>
               </div>
               <div class="text-end">
@@ -40,6 +49,18 @@ const tongThanhToan = computed(() => {
       </div>
 
       <div class="col-lg-5">
+
+        <div class="card shadow-sm border-0 mb-4 border-info">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3 border-bottom pb-2 text-info">📍 Thông tin Giao hàng</h5>
+            
+            <div class="mb-2">
+              <label class="form-label small fw-bold text-dark mb-1">Địa chỉ nhận hàng <span class="text-danger">*</span></label>
+              <textarea v-model="diaChiGiaoHang" class="form-control border-info" rows="2" placeholder="VD: Tòa nhà FPT, Số nhà, Đường..."></textarea>
+            </div>
+          </div>
+        </div>
+
         <div class="card shadow-sm border-0 mb-4">
           <div class="card-body">
             <h5 class="fw-bold mb-3 border-bottom pb-2">🎟️ Mã giảm giá</h5>

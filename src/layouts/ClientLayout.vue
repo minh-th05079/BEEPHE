@@ -2,9 +2,9 @@
 import { ref } from 'vue'
 import { 
   currentView, cart, totalItemsInCart, totalAmount, 
-  increaseCartItem, decreaseCartItem, removeCartItem,
-  dsDanhMuc, activeCategory,
-  currentUserProfile 
+  increaseCartItem, decreaseCartItem, removeCartItem, updateCartItemQuantity,
+  dsDanhMuc, activeCategory, currentUserProfile, xoaThongBao,
+  searchQuery 
 } from '../store.js'
 
 const isMenuOpen = ref(true) 
@@ -14,26 +14,20 @@ const isMenuOpen = ref(true)
   <div class="d-flex flex-column vh-100 overflow-hidden bg-light">
     
     <div class="shadow-sm" style="z-index: 1050;">
-      
-      <header :class="['py-2 border-bottom transition-all position-relative', 
-                currentUserProfile.loaiKhach === 'VIP' ? 'vip-header' : 
-                currentUserProfile.loaiKhach === 'Quen' ? 'quen-header' : 'bg-white']">
+      <header :class="['py-2 border-bottom transition-all position-relative', currentUserProfile.loaiKhach === 'VIP' ? 'vip-header' : currentUserProfile.loaiKhach === 'Quen' ? 'quen-header' : 'bg-white']">
         
         <div v-if="currentUserProfile.loaiKhach === 'VIP'" class="sparkle-layer"></div>
         <div v-if="currentUserProfile.loaiKhach === 'Quen'" class="silver-sparkle-layer"></div>
 
         <div class="container-fluid px-4 d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
-          <h3 :class="['fw-bold m-0', 
-              currentUserProfile.loaiKhach === 'VIP' ? 'text-white text-shadow-gold' : 
-              currentUserProfile.loaiKhach === 'Quen' ? 'text-dark text-shadow-silver' : 'text-primary']" 
-              style="cursor: pointer; letter-spacing: 2px;" @click="currentView = 'client'">
+          
+          <h3 :class="['fw-bold m-0', currentUserProfile.loaiKhach === 'VIP' ? 'text-white text-shadow-gold' : currentUserProfile.loaiKhach === 'Quen' ? 'text-dark text-shadow-silver' : 'text-primary']" style="cursor: pointer; letter-spacing: 2px;" @click="currentView = 'client'">
             ☕ BEEPHE 
             <span v-if="currentUserProfile.loaiKhach === 'VIP'" class="vip-crown">👑</span>
             <span v-if="currentUserProfile.loaiKhach === 'Quen'" class="quen-diamond">💎</span>
           </h3>
           
           <div class="d-flex align-items-center gap-2">
-            
             <div v-if="currentUserProfile.loaiKhach === 'VIP'" class="badge rounded-pill vip-badge d-flex align-items-center px-4 py-2 shadow-lg me-2 border border-warning">
               <span class="fs-6 fw-bold">🌟 KHÁCH VIP - {{ currentUserProfile.user }}</span>
             </div>
@@ -41,23 +35,60 @@ const isMenuOpen = ref(true)
               <span class="fs-6 fw-bold">🌟 KHÁCH QUEN - {{ currentUserProfile.user }}</span>
             </div>
 
+            <div class="dropdown me-2">
+              <button class="btn btn-light border-0 shadow-sm position-relative" type="button" data-bs-toggle="dropdown" title="Thông báo hệ thống">
+                🔔
+                <span v-if="currentUserProfile.id && currentUserProfile.thongBao && currentUserProfile.thongBao.length > 0" class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle">
+                  <span class="visually-hidden">New alerts</span>
+                </span>
+              </button>
+              
+              <ul class="dropdown-menu dropdown-menu-end p-3 shadow-lg" style="width: 320px; border-radius: 12px; max-height: 400px; overflow-y: auto;">
+                <h6 class="fw-bold border-bottom pb-2 mb-2">Thông báo của bạn</h6>
+                
+                <li v-if="!currentUserProfile.id" class="text-center text-muted py-2 small">
+                  Vui lòng <a href="#" @click.prevent="currentView = 'login'" class="text-primary fw-bold text-decoration-none">đăng nhập</a> để nhận và xem thông báo.
+                </li>
+                
+                <li v-else-if="!currentUserProfile.thongBao || currentUserProfile.thongBao.length === 0" class="text-center text-muted py-2 small">
+                  Bạn không có thông báo nào.
+                </li>
+                
+                <template v-else>
+                  <li v-for="(tb, index) in (currentUserProfile.thongBao || []).slice().reverse()" :key="tb.id" class="mb-2 border-bottom pb-2 position-relative">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <small class="text-muted fw-bold" style="font-size: 0.75rem;">📅 {{ tb.thoiGian }}</small>
+                      <button @click.stop="xoaThongBao(currentUserProfile.thongBao.length - 1 - index)" class="btn-close" style="font-size: 0.6rem;" title="Xóa thông báo này"></button>
+                    </div>
+                    <p class="small mb-0 text-dark mt-1">{{ tb.noiDung }}</p>
+                  </li>
+                </template>
+              </ul>
+            </div>
+
             <div class="dropdown">
-              <button :class="['btn position-relative dropdown-toggle fw-bold', 
-                currentUserProfile.loaiKhach === 'VIP' ? 'btn-warning text-dark border-0 shadow-lg' : 
-                currentUserProfile.loaiKhach === 'Quen' ? 'btn-light text-dark border-0 shadow-lg' : 'btn-outline-primary']" 
-                type="button" data-bs-toggle="dropdown">
+              <button :class="['btn position-relative dropdown-toggle fw-bold', currentUserProfile.loaiKhach === 'VIP' ? 'btn-warning text-dark border-0 shadow-lg' : currentUserProfile.loaiKhach === 'Quen' ? 'btn-light text-dark border-0 shadow-lg' : 'btn-outline-primary']" type="button" data-bs-toggle="dropdown">
                 🛒 Giỏ hàng <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ totalItemsInCart }}</span>
               </button>
               
               <ul class="dropdown-menu dropdown-menu-end p-3 shadow-lg" style="width: 320px; border-radius: 12px;">
                 <li v-if="cart.length === 0" class="text-center text-muted py-2">Chưa có món nào</li>
+                
                 <li v-for="(item, index) in cart" :key="index" class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
                   <div class="flex-grow-1 pe-2">
-                    <strong class="text-dark d-block mb-2">{{ item.name }}</strong> 
+                    <strong class="text-dark d-block mb-1">{{ item.name }}</strong> 
+                    <small class="text-muted d-block mb-2 fw-semibold" v-if="item.cartOptions">
+                      <span v-for="(val, key, i) in item.cartOptions" :key="key">
+                        <span v-if="key === 'size'">Size {{ val }}</span>
+                        <span v-else>{{ val }}</span>
+                        <span v-if="i !== Object.keys(item.cartOptions).length - 1"> | </span>
+                      </span>
+                    </small>
+
                     <div class="d-flex justify-content-between align-items-center">
                       <div class="input-group input-group-sm" style="width: 100px;">
                         <button @click.stop="decreaseCartItem(index)" class="btn btn-outline-secondary fw-bold px-2">-</button>
-                        <input type="text" class="form-control text-center px-1 fw-bold bg-white" :value="item.quantity" readonly>
+                        <input type="number" class="form-control text-center px-1 fw-bold bg-white" :value="item.quantity" @blur="updateCartItemQuantity(index, $event.target.value)" @keyup.enter="updateCartItemQuantity(index, $event.target.value)" min="1" />
                         <button @click.stop="increaseCartItem(index)" class="btn btn-outline-secondary fw-bold px-2">+</button>
                       </div>
                       <small class="text-primary fw-bold fs-6">{{ (item.price * item.quantity).toLocaleString() }}đ</small>
@@ -65,8 +96,9 @@ const isMenuOpen = ref(true)
                   </div>
                   <button @click.stop="removeCartItem(index)" class="btn btn-sm btn-outline-danger py-2 px-2 ms-2" title="Xóa món này">🗑️</button>
                 </li>
+
                 <li v-if="cart.length > 0" class="mt-2 text-center pt-2">
-                   <div class="d-flex justify-content-between mb-2 fs-5">
+                  <div class="d-flex justify-content-between mb-2 fs-5">
                     <span>Tổng cộng:</span>
                     <strong class="text-danger">{{ totalAmount.toLocaleString() }}đ</strong>
                   </div>
@@ -107,15 +139,15 @@ const isMenuOpen = ref(true)
             <h5 class="fw-bold m-0 text-uppercase text-center text-warning">Thực Đơn</h5>
           </div>
           <div class="list-group list-group-flush flex-grow-1 overflow-y-auto sidebar-scroll pb-5">
-             <button 
-                 @click="activeCategory = 'all'; currentView = 'client'" 
+            <button 
+              @click="activeCategory = 'all'; currentView = 'client'; searchQuery = ''" 
               :class="['list-group-item list-group-item-action fw-bold py-3 px-4 border-bottom menu-item text-nowrap', activeCategory === 'all' ? 'active-menu' : 'text-dark']"
             >
               Tất cả đồ uống
             </button>
             <button 
               v-for="dm in dsDanhMuc" :key="dm.id" 
-              @click="activeCategory = dm.id; currentView = 'client'" 
+              @click="activeCategory = dm.id; currentView = 'client'; searchQuery = ''" 
               :class="['list-group-item list-group-item-action fw-bold py-3 px-4 border-bottom menu-item text-nowrap', activeCategory === dm.id ? 'active-menu' : 'text-dark']"
             >
               {{ dm.name }}
@@ -143,12 +175,7 @@ const isMenuOpen = ref(true)
 </template>
 
 <style scoped>
-.sidebar-wrapper {
-  width: 0;
-  overflow-x: hidden; 
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  flex-shrink: 0;
-}
+.sidebar-wrapper { width: 0; overflow-x: hidden; transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; }
 .sidebar-wrapper.sidebar-open { width: 270px; }
 .sidebar-content { width: 270px; }
 .sidebar-scroll::-webkit-scrollbar { width: 6px; }
@@ -166,81 +193,30 @@ const isMenuOpen = ref(true)
 .active-menu { background-color: #fef9e7 !important; color: #d68910 !important; border-left: 4px solid #d68910 !important; }
 .transition-all { transition: all 0.5s ease; }
 
-/* ========================================= */
-/* --- STYLE SIÊU CẤP DÀNH CHO KHÁCH VIP --- */
-/* ========================================= */
-.vip-header {
-  background: linear-gradient(-45deg, #FFDF00, #D4AF37, #996515, #FFDF00, #F3E5AB);
-  background-size: 400% 400%;
-  animation: goldSweep 4s ease infinite, goldPulse 2s infinite alternate;
-  border-bottom: 4px solid #ffcc00 !important;
-}
+.vip-header { background: linear-gradient(-45deg, #FFDF00, #D4AF37, #996515, #FFDF00, #F3E5AB); background-size: 400% 400%; animation: goldSweep 4s ease infinite, goldPulse 2s infinite alternate; border-bottom: 4px solid #ffcc00 !important; }
 .text-shadow-gold { text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px #fff; }
 .vip-crown { display: inline-block; animation: floatCrown 2s ease-in-out infinite; font-size: 1.4rem; margin-left: 8px; }
+.vip-badge { background: linear-gradient(135deg, #fff200, #ffaa00); color: #5c3a00; text-shadow: 0 1px 1px rgba(255,255,255,0.5); animation: pulseGold 2s infinite; border: 2px solid #FFDF00 !important; }
+.sparkle-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background-image: radial-gradient(white 1px, transparent 1px), radial-gradient(white 1px, transparent 1px); background-size: 30px 30px; background-position: 0 0, 15px 15px; opacity: 0.5; animation: sparkleAnim 3s linear infinite; z-index: 1; }
 
-.vip-badge {
-  background: linear-gradient(135deg, #fff200, #ffaa00);
-  color: #5c3a00;
-  text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-  animation: pulseGold 2s infinite;
-  border: 2px solid #FFDF00 !important;
-}
-
-.sparkle-layer {
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%; pointer-events: none;
-  background-image: radial-gradient(white 1px, transparent 1px), radial-gradient(white 1px, transparent 1px);
-  background-size: 30px 30px;
-  background-position: 0 0, 15px 15px;
-  opacity: 0.5;
-  animation: sparkleAnim 3s linear infinite;
-  z-index: 1;
-}
-
-@keyframes goldPulse {
-  from { box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
-  to { box-shadow: 0 4px 30px rgba(255, 215, 0, 0.9), 0 0 20px #FFDF00; }
-}
+@keyframes goldPulse { from { box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); } to { box-shadow: 0 4px 30px rgba(255, 215, 0, 0.9), 0 0 20px #FFDF00; } }
 @keyframes goldSweep { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 @keyframes floatCrown { 0%, 100% { transform: translateY(0) rotate(-10deg); } 50% { transform: translateY(-5px) rotate(10deg) scale(1.1); } }
 @keyframes pulseGold { 0%, 100% { transform: scale(1); box-shadow: 0 0 5px #ffd700; } 50% { transform: scale(1.05); box-shadow: 0 0 20px #ffd700, 0 0 10px #fff; } }
 @keyframes sparkleAnim { 0% { background-position: 0 0, 15px 15px; } 100% { background-position: 30px 30px, 45px 45px; } }
 
-/* ========================================= */
-/* --- STYLE DÀNH CHO KHÁCH QUEN (BẠC) ---   */
-/* ========================================= */
-.quen-header {
-  background: linear-gradient(-45deg, #E5E4E2, #FFFFFF, #BDBDBD, #E5E4E2);
-  background-size: 300% 300%;
-  animation: silverSweep 5s ease infinite, platinumPulse 2.5s infinite alternate;
-  border-bottom: 4px solid #b0bec5 !important;
-}
+.quen-header { background: linear-gradient(-45deg, #E5E4E2, #FFFFFF, #BDBDBD, #E5E4E2); background-size: 300% 300%; animation: silverSweep 5s ease infinite, platinumPulse 2.5s infinite alternate; border-bottom: 4px solid #b0bec5 !important; }
 .text-shadow-silver { text-shadow: 1px 1px 3px rgba(255, 255, 255, 0.9), 0 0 8px #fff; }
 .quen-diamond { display: inline-block; animation: spinDiamond 4s linear infinite; font-size: 1.3rem; margin-left: 8px; }
+.quen-badge { background: linear-gradient(135deg, #ffffff, #E5E4E2); color: #2c3e50; text-shadow: 0 1px 1px rgba(255,255,255,0.8); box-shadow: 0 0 12px rgba(176, 190, 197, 0.8) !important; border: 2px solid #b0bec5 !important; }
+.silver-sparkle-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background-image: radial-gradient(rgba(255, 255, 255, 1) 2px, transparent 2px); background-size: 40px 40px; background-position: 0 0; opacity: 0.3; animation: sparkleAnim 5s linear infinite; z-index: 1; }
 
-.quen-badge {
-  background: linear-gradient(135deg, #ffffff, #E5E4E2);
-  color: #2c3e50;
-  text-shadow: 0 1px 1px rgba(255,255,255,0.8);
-  box-shadow: 0 0 12px rgba(176, 190, 197, 0.8) !important;
-  border: 2px solid #b0bec5 !important;
-}
-
-.silver-sparkle-layer {
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%; pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 1) 2px, transparent 2px);
-  background-size: 40px 40px;
-  background-position: 0 0;
-  opacity: 0.3;
-  animation: sparkleAnim 5s linear infinite;
-  z-index: 1;
-}
-
-@keyframes platinumPulse {
-  from { box-shadow: 0 4px 10px rgba(176, 190, 197, 0.4); }
-  to { box-shadow: 0 4px 25px rgba(176, 190, 197, 0.9), 0 0 15px #FFFFFF; }
-}
+@keyframes platinumPulse { from { box-shadow: 0 4px 10px rgba(176, 190, 197, 0.4); } to { box-shadow: 0 4px 25px rgba(176, 190, 197, 0.9), 0 0 15px #FFFFFF; } }
 @keyframes silverSweep { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 @keyframes spinDiamond { 0% { transform: rotateY(0deg) scale(1); } 50% { transform: rotateY(180deg) scale(1.1); } 100% { transform: rotateY(360deg) scale(1); } }
+
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; margin: 0; 
+}
 </style>
